@@ -1,0 +1,89 @@
+<!DOCTYPE html><html><head><base target="_top"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial;background:#f4f6f8;color:#17202a}.hidden{display:none!important}button,input,select{font:inherit}.btn{border:0;border-radius:8px;padding:11px 16px;background:#2563eb;color:white;cursor:pointer}.danger{background:#dc2626}.secondary{background:#475467}.input{width:100%;padding:12px;border:1px solid #d0d5dd;border-radius:8px}.login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.login-card{width:100%;max-width:400px;background:white;padding:30px;border-radius:16px;box-shadow:0 10px 35px #0001}.error{display:none;background:#fef3f2;color:#b42318;padding:10px;border-radius:8px;margin-top:12px}.app{min-height:100vh}.side{position:fixed;inset:0 auto 0 0;width:235px;background:#17202a;color:white;padding:18px}.brand{font-size:24px;font-weight:bold;margin-bottom:8px}.user{font-size:13px;color:#98a2b3;border-bottom:1px solid #ffffff22;padding-bottom:18px;margin-bottom:15px}.menu{display:flex;flex-direction:column;gap:5px}.menu button{border:0;background:transparent;color:white;padding:11px;text-align:left;border-radius:8px;cursor:pointer}.menu button:hover,.menu button.active{background:#ffffff18}.logout{position:absolute;left:18px;right:18px;bottom:18px}.main{margin-left:235px;padding:24px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.panel,.stat{background:white;border-radius:14px;padding:20px;box-shadow:0 3px 16px #0000000d}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.stat span{color:#667085;font-size:13px}.stat strong{display:block;font-size:25px;margin-top:8px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.full{grid-column:1/-1}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #eaecf0;text-align:left;font-size:14px}th{background:#f9fafb}.wrap{overflow:auto}.help{font-size:12px;color:#667085;margin-top:5px}.success{display:none;background:#ecfdf3;color:#027a48;padding:10px;border-radius:8px;margin-bottom:12px}@media(max-width:800px){.side{position:static;width:100%;min-height:auto}.main{margin-left:0}.stats,.grid{grid-template-columns:1fr}.logout{position:static;margin-top:15px}}
+</style></head><body>
+<div id="login" class="login"><div class="login-card"><h1>Smart POS</h1><p>Step 2A — Product Add</p><input id="u" class="input" placeholder="Username"><br><br><input id="p" class="input" type="password" placeholder="Password"><br><br><button id="loginBtn" class="btn" style="width:100%">Login</button><div id="err" class="error"></div><p style="font-size:12px">Default: <b>admin</b> / <b>admin123</b></p></div></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">Smart POS</div><div id="user" class="user"></div><nav id="menu" class="menu"></nav><button id="logout" class="btn danger logout">Logout</button></aside><main class="main"><div class="top"><h2 id="title">Dashboard</h2><button id="refresh" class="btn secondary">Refresh</button></div><div id="content"></div></main></div>
+<script>
+const S={session:null},$=id=>document.getElementById(id);
+function call(fn,...args){return new Promise((ok,no)=>google.script.run.withSuccessHandler(ok).withFailureHandler(e=>no(new Error(e&&e.message?e.message:String(e))))[fn](...args))}
+function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+function error(m){$("err").textContent=m;$("err").style.display="block"}
+async function login(){ $("err").style.display="none";$("loginBtn").disabled=true;try{S.session=await call("login",$("u").value,$("p").value);sessionStorage.setItem("POS_SESSION",S.session.sessionId);await open()}catch(e){error(e.message)}finally{$("loginBtn").disabled=false}}
+async function open(){if(!S.session||!S.session.role)throw new Error("Invalid session data. Please login again.");$("login").classList.add("hidden");$("app").classList.remove("hidden");$("user").innerHTML=esc(S.session.name)+"<br>"+esc(S.session.username)+" • "+esc(S.session.role);build();await page("dashboard")}
+function build(){let m=$("menu");m.innerHTML="";add("dashboard","Dashboard");if(["admin","manager"].includes(String(S.session.role).toLowerCase()))add("products","Products");if(String(S.session.role).toLowerCase()==="admin"){add("users","Users");add("settings","Settings")}}
+function add(p,l){let b=document.createElement("button");b.textContent=l;b.dataset.p=p;b.onclick=()=>page(p);$("menu").appendChild(b)}
+async function page(p){document.querySelectorAll("#menu button").forEach(b=>b.classList.toggle("active",b.dataset.p===p));$("content").innerHTML='<div class="panel">Loading...</div>';try{
+if(p==="dashboard"){ $("title").textContent="Dashboard";let d=await call("dashboard",S.session.sessionId);$("content").innerHTML='<div class="stats"><div class="stat"><span>System</span><strong>'+esc(d.appName)+'</strong></div><div class="stat"><span>User</span><strong>'+esc(d.user.name)+'</strong></div><div class="stat"><span>Role</span><strong>'+esc(d.user.role)+'</strong></div></div><br><div class="panel"><h3>Step 2A</h3><p>Product Add is now available. Product data is stored in the Google Sheet <b>Products</b>.</p></div>'}
+if(p==="products"){ $("title").textContent="Product Add";$("content").innerHTML='<div class="panel"><div id="productSuccess" class="success"></div><h3>Add Product</h3><div class="grid"><div><label>Product Name *</label><input id="pn" class="input" placeholder="e.g. Rice 5 KG"></div><div><label>SKU / Barcode *</label><input id="sku" class="input" placeholder="e.g. 89012345"></div><div><label>Category *</label><input id="cat" class="input" placeholder="e.g. Grocery"></div><div>
+<label>Unit *</label>
+<select id="unit" class="input">
+<option value="">Select Unit</option>
+<optgroup label="সাধারণ পণ্য">
+<option value="PCS">PCS — পিস</option><option value="BOX">BOX — বক্স</option>
+<option value="PACK">PACK — প্যাকেট</option><option value="CARTON">CARTON — কার্টন</option>
+<option value="BUNDLE">BUNDLE — বান্ডিল</option><option value="SET">SET — সেট</option>
+<option value="PAIR">PAIR — জোড়া</option><option value="DOZEN">DOZEN — ডজন</option>
+</optgroup>
+<optgroup label="ওজন">
+<option value="KG">KG — কেজি</option><option value="GRAM">GRAM — গ্রাম</option>
+<option value="MG">MG — মিলিগ্রাম</option><option value="TON">TON — টন</option>
+<option value="MAUND">MAUND — মণ</option><option value="SEER">SEER — সের</option>
+<option value="PAW">PAW — পাও</option>
+</optgroup>
+<optgroup label="তরল">
+<option value="LTR">LTR — লিটার</option><option value="ML">ML — মিলিলিটার</option>
+<option value="GALLON">GALLON — গ্যালন</option>
+</optgroup>
+<optgroup label="দৈর্ঘ্য">
+<option value="MM">MM — মিলিমিটার</option><option value="CM">CM — সেন্টিমিটার</option>
+<option value="METER">METER — মিটার</option><option value="INCH">INCH — ইঞ্চি</option>
+<option value="FOOT">FOOT — ফুট</option><option value="YARD">YARD — গজ</option>
+<option value="KM">KM — কিলোমিটার</option>
+</optgroup>
+<optgroup label="ক্ষেত্রফল">
+<option value="SQFT">SQFT — বর্গফুট</option><option value="SQM">SQM — বর্গমিটার</option>
+<option value="SQYD">SQYD — বর্গগজ</option>
+</optgroup>
+<optgroup label="আয়তন">
+<option value="CFT">CFT — ঘনফুট</option><option value="CBM">CBM — ঘনমিটার</option>
+</optgroup>
+<optgroup label="কাপড় ও ফ্যাব্রিক">
+<option value="GAJ">GAJ — গজ</option><option value="HAAT">HAAT — হাত</option>
+<option value="ROLL">ROLL — রোল</option><option value="METER_CLOTH">METER — মিটার</option>
+</optgroup>
+<optgroup label="গহনা / মূল্যবান ধাতু">
+<option value="BHORI">BHORI — ভরি</option><option value="TOLA">TOLA — তোলা</option>
+<option value="ANA">ANA — আনা</option><option value="ROTI">ROTI — রতি</option>
+<option value="GRAM_GOLD">GRAM — গ্রাম</option>
+</optgroup>
+<optgroup label="গণনা">
+<option value="HALF_DOZEN">HALF_DOZEN — আধা ডজন</option><option value="GROSS">GROSS — গ্রস</option>
+<option value="SCORE">SCORE — ২০টি</option>
+</optgroup>
+<optgroup label="অন্যান্য">
+<option value="BAG">BAG — ব্যাগ</option><option value="SACK">SACK — বস্তা</option>
+<option value="BOTTLE">BOTTLE — বোতল</option><option value="CAN">CAN — ক্যান</option>
+<option value="JAR">JAR — জার</option><option value="TIN">TIN — টিন</option>
+<option value="SHEET">SHEET — শিট</option><option value="STRIP">STRIP — স্ট্রিপ</option>
+<option value="BAR">BAR — বার</option><option value="DOOR">DOOR — দরজা</option>
+<option value="OTHER">OTHER — অন্যান্য</option>
+</optgroup>
+</select>
+</div><div><label>Purchase Price *</label><input id="buy" class="input" type="number" min="0" step="0.01" placeholder="0"></div><div><label>Sale Price *</label><input id="sell" class="input" type="number" min="0" step="0.01" placeholder="0"></div><div><label>Opening Stock *</label><input id="opening" class="input" type="number" min="0" step="0.01" placeholder="0"></div><div><label>Minimum Stock *</label><input id="minstock" class="input" type="number" min="0" step="0.01" placeholder="0"></div></div><br><button id="addProductBtn" class="btn" onclick="addProduct()">Save Product</button><p class="help">* Required fields. SKU / Barcode must be unique.</p></div>'}
+if(p==="users"){ $("title").textContent="Users";let us=await call("getUsers",S.session.sessionId);us=Array.isArray(us)?us:[];$("content").innerHTML='<div class="panel"><h3>Create User</h3><div class="grid"><input id="nn" class="input" placeholder="Name"><input id="nu" class="input" placeholder="Username"><input id="np" class="input" type="password" placeholder="Password"><select id="nr" class="input"><option>staff</option><option>manager</option><option>admin</option></select></div><br><button class="btn" onclick="createUser()">Create User</button></div><br><div class="panel"><h3>User List</h3><div class="wrap"><table><tr><th>Name</th><th>Username</th><th>Role</th><th>Active</th></tr>'+us.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(x.username)+'</td><td>'+esc(x.role)+'</td><td>'+x.active+'</td></tr>').join("")+'</table></div></div>'}
+if(p==="settings"){ $("title").textContent="Settings";let st=await call("getSettings",S.session.sessionId);st=Array.isArray(st)?st:[];$("content").innerHTML='<div class="panel"><h3>System Settings</h3><div class="grid"><input id="sk" class="input" placeholder="Key"><input id="sv" class="input" placeholder="Value"></div><br><button class="btn" onclick="saveSetting()">Save</button></div><br><div class="panel"><table><tr><th>Key</th><th>Value</th></tr>'+st.map(x=>'<tr><td>'+esc(x.key)+'</td><td>'+esc(x.value)+'</td></tr>').join("")+'</table></div>'}
+}catch(e){$("content").innerHTML='<div class="panel"><h3>Loading Error</h3><p>'+esc(e.message)+'</p></div>'}}
+async function addProduct(){
+  const btn=$("addProductBtn");const success=$("productSuccess");success.style.display="none";btn.disabled=true;btn.textContent="Saving...";
+  try{
+    const result=await call("addProduct",S.session.sessionId,{productName:$("pn").value,sku:$("sku").value,category:$("cat").value,unit:$("unit").value,purchasePrice:$("buy").value,salePrice:$("sell").value,openingStock:$("opening").value,minimumStock:$("minstock").value});
+    success.textContent="Product saved successfully. Product ID: "+result.product.productId;success.style.display="block";
+    ["pn","sku","cat","buy","sell","opening","minstock"].forEach(id=>$(id).value="");$("unit").value="";
+  }catch(e){alert(e.message)}finally{btn.disabled=false;btn.textContent="Save Product"}
+}
+async function createUser(){try{await call("saveUser",S.session.sessionId,{name:$("nn").value,username:$("nu").value,password:$("np").value,role:$("nr").value});await page("users")}catch(e){alert(e.message)}}
+async function saveSetting(){try{await call("saveSetting",S.session.sessionId,$("sk").value,$("sv").value);await page("settings")}catch(e){alert(e.message)}}
+async function logout(){try{await call("logout",S.session.sessionId)}catch(e){}sessionStorage.removeItem("POS_SESSION");location.reload()}
+async function restore(){let sid=sessionStorage.getItem("POS_SESSION");if(!sid)return;try{let d=await call("dashboard",sid);S.session={sessionId:sid,userId:d.user.id,name:d.user.name,username:d.user.username,role:d.user.role};await open()}catch(e){sessionStorage.removeItem("POS_SESSION")}}
+$("loginBtn").onclick=login;$("p").onkeydown=e=>{if(e.key==="Enter")login()};$("logout").onclick=logout;$("refresh").onclick=()=>page("dashboard");restore();
+</script></body></html>
