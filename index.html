@@ -1,0 +1,2530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quiz Portal</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root{
+  --navy:#1B2A4A;
+  --navy-dim:#2B3E63;
+  --orange:#F46B12;
+  --orange-dim:#F79A5C;
+  --orange-dark:#C6540C;
+  --bg:#F5F6F8;
+  --surface:#FFFFFF;
+  --surface-2:#F0F2F5;
+  --line:#E3E6EB;
+  --text:#1F2430;
+  --text-dim:#6B7280;
+  --text-mute:#9CA3AF;
+  --green:#2F9E58;
+  --green-bg:#E7F6EC;
+  --red:#D64545;
+  --red-bg:#FBE9E9;
+  --blue:#2F6FE0;
+  --blue-bg:#E9F0FE;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;width:100%;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;}
+button,select,input,textarea{font-family:'Inter',sans-serif;}
+button{cursor:pointer;}
+
+.shell{width:100%;max-width:1160px;margin:0 auto;padding:20px 20px 60px;}
+
+/* ---- top bar ---- */
+.topbar{display:flex;align-items:center;gap:16px;background:var(--navy);color:#fff;border-radius:12px;padding:14px 20px;margin-bottom:20px;}
+.brand{font-weight:700;font-size:17px;display:flex;align-items:center;gap:10px;}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:var(--orange);}
+.top-user{display:flex;align-items:center;gap:12px;margin-left:auto;font-size:13px;}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--orange);color:#fff;font-weight:600;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden;}
+.avatar img{width:100%;height:100%;object-fit:cover;}
+.role-pill{font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,0.15);margin-left:6px;}
+.logout-btn{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);color:#fff;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;}
+.logout-btn:hover{background:rgba(255,255,255,0.25);}
+
+/* ---- login ---- */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+.login-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:36px 34px;width:100%;max-width:380px;box-shadow:0 12px 40px rgba(20,25,40,0.08);}
+.login-logo{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:6px;}
+.login-logo img{width:84px;height:84px;border-radius:16px;object-fit:cover;}
+.login-logo span{font-weight:700;font-size:19px;color:var(--navy);}
+.login-sub{font-size:13px;color:var(--text-dim);margin-bottom:24px;text-align:center;}
+.login-error{background:var(--red-bg);color:var(--red);font-size:12px;padding:9px 12px;border-radius:8px;margin-bottom:14px;}
+.login-note{font-size:11px;color:var(--text-mute);margin-top:18px;line-height:1.6;text-align:center;}
+.remember-row{display:flex;align-items:center;gap:8px;margin:-4px 0 16px;}
+.remember-row label{font-size:12px;color:var(--text-dim);}
+
+/* ---- tabs ---- */
+.tabs{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;}
+.tab-btn{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:9px 18px;font-size:13px;color:var(--text-dim);font-weight:500;}
+.tab-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+.tab-btn:hover:not(.active){border-color:var(--orange-dim);color:var(--text);}
+.subtabs{display:flex;gap:6px;margin-bottom:16px;}
+.subtab-btn{background:none;border:none;padding:8px 4px;font-size:13px;color:var(--text-dim);border-bottom:2px solid transparent;font-weight:500;}
+.subtab-btn.active{color:var(--orange);border-bottom-color:var(--orange);}
+
+/* ---- cards ---- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-bottom:16px;}
+.section-title{font-size:13px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:14px;}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+.stat-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center;}
+.stat-icon{font-size:20px;margin-bottom:4px;}
+.stat-num{font-size:24px;font-weight:700;color:var(--navy);font-family:'JetBrains Mono',monospace;}
+.stat-lbl{font-size:11px;color:var(--text-dim);margin-top:2px;}
+.empty-note{text-align:center;color:var(--text-mute);font-size:13px;padding:26px 10px;}
+
+/* ---- forms ---- */
+.form-row{margin-bottom:14px;}
+.form-row label{display:block;font-size:11px;color:var(--text-dim);margin-bottom:6px;letter-spacing:0.2px;}
+.form-row input[type=text],.form-row input[type=email],.form-row input[type=password],.form-row input[type=number],.form-row select,.form-row input[type=date],.form-row input[type=time],.form-row textarea{
+  width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text);
+}
+.form-row input:focus,.form-row select:focus{outline:none;border-color:var(--orange-dim);}
+.btn{background:var(--navy);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;}
+.btn:hover{background:var(--navy-dim);}
+.btn.primary{background:var(--orange);}
+.btn.primary:hover{background:var(--orange-dark);}
+.btn.secondary{background:none;border:1px solid var(--line);color:var(--text);}
+.btn.secondary:hover{border-color:var(--orange-dim);color:var(--orange);}
+.btn.danger{background:none;border:1px solid var(--red);color:var(--red);}
+.btn.danger:hover{background:var(--red-bg);}
+.btn.small{padding:6px 12px;font-size:11px;}
+.btn:disabled{opacity:0.5;cursor:not-allowed;}
+.btn-full{width:100%;padding:11px;font-size:14px;}
+
+table.data-table{width:100%;border-collapse:collapse;font-size:13px;}
+table.data-table th{text-align:left;font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:0.3px;padding:9px 10px;border-bottom:1px solid var(--line);}
+table.data-table td{padding:10px 10px;border-bottom:1px solid var(--line);}
+table.data-table tr:last-child td{border-bottom:none;}
+.role-badge{font-size:10px;padding:3px 9px;border-radius:10px;font-weight:600;}
+.role-badge.admin{background:var(--red-bg);color:var(--red);}
+.role-badge.user{background:var(--green-bg);color:var(--green);}
+.role-badge.leader{background:var(--blue-bg);color:var(--blue);}
+.role-badge.management{background:#F1E9FC;color:#7B3FE4;}
+.status-badge{font-size:10px;padding:3px 9px;border-radius:10px;font-weight:600;}
+.status-badge.running{background:var(--green-bg);color:var(--green);}
+.status-badge.scheduled{background:#FFF1E4;color:var(--orange);}
+.status-badge.off{background:var(--surface-2);color:var(--text-mute);}
+
+/* ---- quiz list / taking ---- */
+.quiz-list-row{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px;}
+.quiz-list-title{font-size:14px;font-weight:600;}
+.quiz-list-meta{font-size:11px;color:var(--text-dim);margin-top:3px;}
+.quiz-progress{font-size:11px;color:var(--text-mute);margin-bottom:6px;}
+.quiz-dots{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+.quiz-dot{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:var(--surface-2);font-size:11px;display:flex;align-items:center;justify-content:center;color:var(--text-dim);}
+.quiz-dot.current{border-color:var(--orange);color:var(--orange);font-weight:700;}
+.quiz-dot.answered{background:var(--navy);color:#fff;border-color:var(--navy);}
+.quiz-dot.answered.current{background:var(--orange);border-color:var(--orange);}
+.quiz-question{font-size:16px;font-weight:600;margin-bottom:16px;line-height:1.5;}
+.quiz-option{display:block;width:100%;text-align:left;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:13px;margin-bottom:9px;color:var(--text);}
+.quiz-option:hover{border-color:var(--orange-dim);}
+.quiz-option.selected{border-color:var(--orange);background:#FFF1E4;color:var(--orange-dark);font-weight:600;}
+.quiz-nav-row{display:flex;justify-content:space-between;gap:10px;margin-top:8px;}
+.quiz-result{text-align:center;padding:24px 10px;}
+.quiz-result .score{font-size:40px;font-weight:700;color:var(--orange);font-family:'JetBrains Mono',monospace;}
+.quiz-timer{background:var(--orange);color:#fff;font-size:12px;padding:4px 10px;border-radius:10px;font-family:'JetBrains Mono',monospace;}
+.quiz-timer.low{background:var(--red);}
+
+/* ---- podium ---- */
+.podium{display:flex;justify-content:center;align-items:flex-end;gap:20px;margin-bottom:22px;flex-wrap:wrap;}
+.podium-slot{display:flex;flex-direction:column;align-items:center;text-align:center;width:120px;}
+.podium-photo-wrap{position:relative;margin-bottom:10px;}
+.podium-photo{border-radius:50%;object-fit:cover;border:3px solid var(--orange);background:var(--surface-2);}
+.podium-photo-placeholder{border-radius:50%;background:var(--surface-2);border:3px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text-mute);font-weight:700;}
+.podium-rank-badge{position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);background:var(--orange);color:#fff;font-size:11px;font-weight:700;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;}
+.podium-slot.rank1 .podium-photo,.podium-slot.rank1 .podium-photo-placeholder{width:100px;height:100px;font-size:32px;border-color:#F4B740;}
+.podium-slot.rank1 .podium-rank-badge{background:#F4B740;}
+.podium-slot.rank2 .podium-photo,.podium-slot.rank2 .podium-photo-placeholder{width:80px;height:80px;font-size:26px;border-color:#B7BEC7;}
+.podium-slot.rank2 .podium-rank-badge{background:#9AA3AF;}
+.podium-slot.rank3 .podium-photo,.podium-slot.rank3 .podium-photo-placeholder{width:80px;height:80px;font-size:26px;border-color:#D79A6B;}
+.podium-slot.rank3 .podium-rank-badge{background:#C9803F;}
+.podium-name{font-size:13px;font-weight:700;margin-top:2px;}
+.podium-team{font-size:11px;color:var(--text-dim);}
+.podium-score{font-size:12px;color:var(--orange);font-weight:700;margin-top:2px;font-family:'JetBrains Mono',monospace;}
+
+/* ---- charts ---- */
+.chart-row{display:flex;gap:16px;flex-wrap:wrap;}
+.chart-box{flex:1;min-width:220px;}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12px;}
+.bar-label{width:130px;flex:none;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bar-track{flex:1;background:var(--surface-2);border-radius:6px;height:14px;overflow:hidden;}
+.bar-fill{height:100%;background:var(--orange);border-radius:6px;}
+.bar-value{width:44px;flex:none;text-align:right;font-family:'JetBrains Mono',monospace;color:var(--text-dim);}
+.legend-row{display:flex;align-items:center;gap:6px;font-size:12px;margin-top:6px;}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex:none;}
+
+/* ---- review blocks ---- */
+.review-block{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:10px;}
+.review-q{font-size:13px;font-weight:600;margin-bottom:6px;}
+.review-a{font-size:12px;color:var(--text-dim);}
+.review-remark{font-size:11px;color:var(--green);margin-top:6px;}
+
+/* ---- history filters ---- */
+.filter-row{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end;}
+
+.ku-toolbar-row{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.ku-search-box{flex:1;min-width:220px;}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;}
+.status-dot.on{background:var(--green);}
+.status-dot.off{background:var(--text-mute);}
+.icon-btn{width:30px;height:30px;border-radius:6px;border:none;color:#fff;font-size:13px;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;}
+.icon-btn.view{background:#1AA6B7;}
+.icon-btn.edit{background:var(--orange);}
+.icon-btn.delete{background:var(--red);}
+.rte-mini-toolbar{display:flex;gap:4px;flex-wrap:wrap;border:1px solid var(--line);border-bottom:none;border-radius:8px 8px 0 0;background:var(--surface-2);padding:6px;}
+.rte-mini-btn{background:none;border:1px solid transparent;border-radius:5px;padding:5px 9px;font-size:12px;color:var(--text);min-width:28px;}
+.rte-mini-btn:hover{background:var(--surface);border-color:var(--line);}
+.rte-mini-editor{border:1px solid var(--line);border-radius:0 0 8px 8px;min-height:160px;padding:12px 14px;font-size:13px;line-height:1.6;background:var(--surface);}
+.rte-mini-editor:focus{outline:none;border-color:var(--orange-dim);}
+.rte-mini-editor:empty:before{content:attr(data-placeholder);color:var(--text-mute);}
+.ku-content-view{font-size:13px;line-height:1.7;}
+.ku-content-view img{max-width:100%;}
+
+.admin-menu-wrap{position:relative;}
+.admin-menu-btn{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;width:30px;height:30px;font-size:16px;display:flex;align-items:center;justify-content:center;}
+.admin-menu-btn:hover{background:rgba(255,255,255,0.22);}
+.admin-menu-panel{position:absolute;top:calc(100% + 8px);left:0;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,0.16);padding:6px;min-width:200px;z-index:90;display:none;}
+.admin-menu-panel.open{display:block;}
+.admin-menu-item{display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:13px;color:var(--text);border-radius:6px;cursor:pointer;white-space:nowrap;}
+.admin-menu-item:hover{background:var(--surface-2);}
+.admin-menu-item.active{background:var(--surface-2);color:var(--orange);font-weight:600;}
+.admin-menu-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;}
+.filter-row .form-row{margin-bottom:0;flex:1;min-width:160px;}
+
+/* ---- modal ---- */
+.modal-overlay{position:fixed;inset:0;background:rgba(20,25,40,0.5);display:flex;align-items:center;justify-content:center;padding:20px;z-index:100;}
+.modal-box{background:var(--surface);border-radius:12px;max-width:640px;width:100%;max-height:88vh;overflow-y:auto;padding:22px 24px;}
+.modal-box.wide{max-width:820px;}
+.modal-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+.modal-close{background:none;border:none;font-size:18px;color:var(--text-mute);}
+.modal-close:hover{color:var(--text);}
+.modal-title{font-size:17px;font-weight:700;margin:0;}
+
+@media(max-width:640px){
+  .stat-grid{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(function(){
+
+  /* ================= HELPERS ================= */
+  function escapeHtml(s){
+    var div = document.createElement('div');
+    div.textContent = s == null ? '' : String(s);
+    return div.innerHTML;
+  }
+  function uid(){ return Math.random().toString(36).slice(2,10); }
+  function fmtDate(d){
+    var dt = new Date(d);
+    var months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[dt.getMonth()]+' '+dt.getDate()+', '+dt.getFullYear();
+  }
+  function fmtDateTime(ts){
+    var dt = new Date(ts);
+    var h = dt.getHours();
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    var h12 = h % 12; if(h12 === 0) h12 = 12;
+    var mins = dt.getMinutes();
+    var minsStr = mins < 10 ? '0'+mins : ''+mins;
+    return fmtDate(dt) + ' ' + h12 + ':' + minsStr + ' ' + ampm;
+  }
+  function shuffleArr(arr){
+    var a = arr.slice();
+    for(var i=a.length-1;i>0;i--){
+      var j = Math.floor(Math.random()*(i+1));
+      var t=a[i]; a[i]=a[j]; a[j]=t;
+    }
+    return a;
+  }
+  function resizeImageToSquare(file, size, cb){
+    var reader = new FileReader();
+    reader.onload = function(){
+      var img = new Image();
+      img.onload = function(){
+        var side = Math.min(img.width, img.height);
+        var sx = (img.width - side) / 2;
+        var sy = (img.height - side) / 2;
+        var canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+        cb(canvas.toDataURL('image/jpeg', 0.9));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+  function downloadCSV(filename, headerRow, rows){
+    var csv = [headerRow].concat(rows).map(function(row){
+      return row.map(function(cell){
+        var v = String(cell==null?'':cell).replace(/"/g,'""');
+        return '"'+v+'"';
+      }).join(',');
+    }).join('\r\n');
+    var BOM = '\uFEFF'; // ensures Excel renders Bangla (and other non-Latin) text correctly
+    var blob = new Blob([BOM + csv], {type:'text/csv;charset=utf-8;'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  /* ================= SIMPLE CHARTS (no external library) ================= */
+  function buildDonutSVG(segments, size){
+    size = size || 140;
+    var total = segments.reduce(function(s,x){return s+x.value;}, 0);
+    if(total <= 0){
+      return '<div class="empty-note">No data yet.</div>';
+    }
+    var r = size/2 - 14;
+    var cx = size/2, cy = size/2;
+    var circumference = 2 * Math.PI * r;
+    var offset = 0;
+    var circles = segments.map(function(seg){
+      var frac = seg.value / total;
+      var dash = frac * circumference;
+      var circle = '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+seg.color+'" stroke-width="20" '+
+        'stroke-dasharray="'+dash+' '+(circumference-dash)+'" stroke-dashoffset="'+(-offset)+'" transform="rotate(-90 '+cx+' '+cy+')"/>';
+      offset += dash;
+      return circle;
+    }).join('');
+    var svg = '<svg viewBox="0 0 '+size+' '+size+'" width="'+size+'" height="'+size+'">'+circles+
+      '<text x="'+cx+'" y="'+(cy+5)+'" text-anchor="middle" font-size="16" font-weight="700" fill="var(--text)" font-family="JetBrains Mono, monospace">'+Math.round((segments[0].value/total)*100)+'%</text>'+
+      '</svg>';
+    var legend = segments.map(function(seg){
+      return '<div class="legend-row"><span class="legend-dot" style="background:'+seg.color+';"></span>'+escapeHtml(seg.label)+' ('+seg.value+')</div>';
+    }).join('');
+    return '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;"><div>'+svg+'</div><div>'+legend+'</div></div>';
+  }
+  function buildBarList(bars){
+    if(bars.length === 0) return '<div class="empty-note">No data yet.</div>';
+    var max = Math.max.apply(null, bars.map(function(b){return b.value;}).concat([1]));
+    return bars.map(function(b){
+      var pct = Math.round((b.value/max)*100);
+      return '<div class="bar-row"><div class="bar-label" title="'+escapeHtml(b.label)+'">'+escapeHtml(b.label)+'</div>'+
+        '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;"></div></div>'+
+        '<div class="bar-value">'+b.value+'%</div></div>';
+    }).join('');
+  }
+
+  /* ================= DATA MODEL ================= */
+  var DEFAULT_TEAMS = ['Inbound','Recurring','Telesales','Welcome','Complaint Management'];
+  var ROLES = ['User','Team Leader','Management','Admin'];
+
+  function defaultData(){
+    var adminId = uid(), leaderId = uid(), user1Id = uid(), user2Id = uid(), mgmtId = uid();
+    var q1=uid(), q2=uid(), q3=uid(), q4=uid(), q5=uid();
+    return {
+      teams: DEFAULT_TEAMS.slice(),
+      users: [
+        {id:adminId, name:'System Admin', email:'admin@guardianlife.com', password:'admin123', role:'Admin', team:null, mustChangePassword:false, photo:null},
+        {id:leaderId, name:'Musfiq Bhai', email:'leader@guardianlife.com', password:'welcome123', role:'Team Leader', team:'Inbound', mustChangePassword:true, photo:null},
+        {id:mgmtId, name:'Quality Team', email:'quality@guardianlife.com', password:'welcome123', role:'Management', team:null, mustChangePassword:true, photo:null},
+        {id:user1Id, name:'Rahat Hossain', email:'rahat@guardianlife.com', password:'welcome123', role:'User', team:'Inbound', mustChangePassword:true, photo:null},
+        {id:user2Id, name:'Sadia Karim', email:'sadia@guardianlife.com', password:'welcome123', role:'User', team:'Telesales', mustChangePassword:true, photo:null}
+      ],
+      questionBank: [
+        {id:q1, team:'Inbound', question:'What is the standard turnaround time mentioned in the retail loan guideline?', options:['Same day','As set in the guideline','No fixed time','Only on weekends'], correctIndex:1, acceptedIndexes:[1]},
+        {id:q2, team:'Inbound', question:'Bancassurance product updates are reviewed on what basis?', options:['Daily','Quarterly','Yearly only','Never'], correctIndex:1, acceptedIndexes:[1]},
+        {id:q3, team:'Telesales', question:'What does KYC stand for?', options:['Keep Your Cash','Know Your Customer','Key Yield Calculation','Know Your Contract'], correctIndex:1, acceptedIndexes:[1]},
+        {id:q4, team:'Telesales', question:'Who approves access to operational tools?', options:['Any employee','The approval chain for the access tier','No approval needed','Only IT'], correctIndex:1, acceptedIndexes:[1]},
+        {id:q5, team:'Complaint Management', question:'Delayed claims should follow what process?', options:['No process','The escalation path','A public complaint','Ignore it'], correctIndex:1, acceptedIndexes:[1]}
+      ],
+      teamUsedQuestionIds: {},
+      quizzes: [],
+      quizAttempts: [],
+      disputes: [],
+      userCompletedQuizzes: {},
+      userLogins: {},
+      knowledgeUpdates: [],
+      userSeenKnowledgeUpdates: {}
+    };
+  }
+
+  var state = {
+    data: null,
+    lastSyncedData: null,
+    currentUserId: null,
+    tab: 'quiz',
+    quizMgmtSubtab: 'bank',
+    loginError: '',
+    quizSession: null,
+    editingUserId: null,
+    editingQuestionId: null,
+    editingQuizId: null,
+    changePwError: '',
+    changePwSuccess: false,
+    disputingAnswerIndex: null,
+    historySearchTitle: '',
+    historySearchDate: '',
+    reportsTeamFilter: '',
+    reportsUserFilter: '',
+    reportsStartDate: '',
+    reportsEndDate: '',
+    viewingAttemptId: null,
+    rememberChecked: true,
+    kuMode: 'list',
+    editingKuId: null,
+    kuSearchName: '',
+    kuGateIndex: 0,
+    viewingKuId: null,
+    adminMenuOpen: false
+  };
+
+  var SESSION_KEY = 'quiz-portal-session-v1';
+  var SYNC_KEYS = ['teams','users','questionBank','quizzes','quizAttempts','disputes','knowledgeUpdates','teamUsedQuestionIds','userCompletedQuizzes','userSeenKnowledgeUpdates','userLogins'];
+
+  // Session token only (which user is currently logged in on THIS device) —
+  // fine to keep in the browser's own localStorage. No real data lives here,
+  // so an Incognito window simply starts logged-out — it reads/writes the
+  // exact same shared Google Sheet as every other session.
+  function sessionGet(key){
+    try{ return window.localStorage.getItem(key); }catch(e){ return null; }
+  }
+  function sessionSet(key, value){
+    try{ window.localStorage.setItem(key, value); return true; }catch(e){ return false; }
+  }
+
+  function gsGetAllData(){
+    return new Promise(function(resolve){
+      google.script.run
+        .withSuccessHandler(function(value){ resolve(value); })
+        .withFailureHandler(function(err){ console.error('gsGetAllData error:', err); resolve(null); })
+        .getAllData();
+    });
+  }
+  function gsSaveChanged(payloadObj){
+    return new Promise(function(resolve){
+      google.script.run
+        .withSuccessHandler(function(){ resolve(true); })
+        .withFailureHandler(function(err){ console.error('gsSaveChanged error:', err); resolve(false); })
+        .saveChangedCollections(JSON.stringify(payloadObj));
+    });
+  }
+
+  function normalizeData(d){
+    if(!d.teams) d.teams = DEFAULT_TEAMS.slice();
+    if(!d.teamUsedQuestionIds) d.teamUsedQuestionIds = {};
+    if(!d.quizzes) d.quizzes = [];
+    if(!d.quizAttempts) d.quizAttempts = [];
+    if(!d.disputes) d.disputes = [];
+    if(!d.userCompletedQuizzes) d.userCompletedQuizzes = {};
+    if(!d.userLogins) d.userLogins = {};
+    if(!d.knowledgeUpdates) d.knowledgeUpdates = [];
+    if(!d.userSeenKnowledgeUpdates) d.userSeenKnowledgeUpdates = {};
+    if(!d.users) d.users = [];
+    if(!d.questionBank) d.questionBank = [];
+    d.questionBank.forEach(function(q){
+      if(!q.acceptedIndexes) q.acceptedIndexes = [q.correctIndex];
+    });
+    d.users.forEach(function(u){
+      if(u.team === undefined) u.team = null;
+      if(u.photo === undefined) u.photo = null;
+      if(ROLES.indexOf(u.role) === -1) u.role = 'User';
+    });
+    return d;
+  }
+
+  async function loadData(){
+    var raw = await gsGetAllData();
+    var fresh = null;
+    try{ fresh = raw ? JSON.parse(raw) : null; }catch(e){ fresh = null; }
+
+    var isEmpty = !fresh || !fresh.users || fresh.users.length === 0;
+    if(isEmpty){
+      // First-ever run against this database: seed every tab at once.
+      state.data = normalizeData(defaultData());
+      var seedPayload = {};
+      SYNC_KEYS.forEach(function(k){ seedPayload[k] = state.data[k]; });
+      await gsSaveChanged(seedPayload);
+    }else{
+      state.data = normalizeData(fresh);
+    }
+    state.lastSyncedData = JSON.parse(JSON.stringify(state.data));
+
+    var session = sessionGet(SESSION_KEY);
+    if(session){
+      var u = state.data.users.find(function(x){return x.id===session;});
+      if(u) state.currentUserId = u.id;
+    }
+    render();
+  }
+
+  var saveInFlight = false;
+  var savePendingAgain = false;
+  async function saveData(){
+    if(saveInFlight){ savePendingAgain = true; return; }
+    saveInFlight = true;
+    try{
+      var changedKeys = SYNC_KEYS.filter(function(k){
+        return JSON.stringify(state.data[k]) !== JSON.stringify(state.lastSyncedData ? state.lastSyncedData[k] : undefined);
+      });
+      if(changedKeys.length){
+        var payload = {};
+        changedKeys.forEach(function(k){ payload[k] = state.data[k]; });
+        await gsSaveChanged(payload);
+      }
+      // Pick up anything OTHER sessions saved in the meantime, for every
+      // collection this save didn't just touch.
+      var raw = await gsGetAllData();
+      if(raw){
+        var fresh = null;
+        try{ fresh = JSON.parse(raw); }catch(e){ fresh = null; }
+        if(fresh){
+          SYNC_KEYS.forEach(function(k){
+            if(changedKeys.indexOf(k) === -1) state.data[k] = fresh[k];
+          });
+        }
+      }
+      state.data = normalizeData(state.data);
+      state.lastSyncedData = JSON.parse(JSON.stringify(state.data));
+    }catch(e){
+      console.error('saveData error:', e);
+    }
+    saveInFlight = false;
+    if(savePendingAgain){ savePendingAgain = false; saveData(); }
+    render();
+  }
+  function currentUser(){
+    return state.data.users.find(function(u){return u.id===state.currentUserId;});
+  }
+  function isAnswerAccepted(question, index){
+    return question.acceptedIndexes.indexOf(index) !== -1;
+  }
+  function recomputeScoresForQuestion(questionId, remarkText){
+    var q = state.data.questionBank.find(function(x){return x.id===questionId;});
+    if(!q) return;
+    state.data.quizAttempts.forEach(function(attempt){
+      attempt.answers.forEach(function(ans){
+        if(ans.questionId !== questionId) return;
+        var shouldBeCorrect = isAnswerAccepted(q, ans.selectedIndex);
+        if(shouldBeCorrect && !ans.isCorrect){
+          ans.isCorrect = true;
+          ans.remark = remarkText || 'Marked correct after dispute review';
+          attempt.score += 1;
+        }
+      });
+    });
+  }
+  function quizStatus(quiz){
+    if(!quiz.enabled) return 'off';
+    var dt = new Date(quiz.scheduledDate + 'T' + (quiz.scheduledTime||'00:00') + ':00');
+    return Date.now() >= dt.getTime() ? 'running' : 'scheduled';
+  }
+
+  function isKnowledgeUpdateLive(ku){
+    if(ku.status !== 1) return false;
+    return new Date(ku.startDateTime).getTime() <= Date.now();
+  }
+  function liveKnowledgeUpdates(){
+    return state.data.knowledgeUpdates.filter(isKnowledgeUpdateLive).sort(function(a,b){ return new Date(b.startDateTime) - new Date(a.startDateTime); });
+  }
+  function anyUnseenKnowledgeUpdateLive(){
+    var seen = state.data.userSeenKnowledgeUpdates[state.currentUserId] || [];
+    return liveKnowledgeUpdates().some(function(ku){ return seen.indexOf(ku.id) === -1; });
+  }
+  function markLiveKnowledgeUpdatesSeen(){
+    if(!state.data.userSeenKnowledgeUpdates[state.currentUserId]) state.data.userSeenKnowledgeUpdates[state.currentUserId] = [];
+    var seen = state.data.userSeenKnowledgeUpdates[state.currentUserId];
+    liveKnowledgeUpdates().forEach(function(ku){ if(seen.indexOf(ku.id) === -1) seen.push(ku.id); });
+    saveData();
+  }
+  function leaderboardData(teamFilter){
+    var byUser = {};
+    state.data.quizAttempts.forEach(function(a){
+      if(teamFilter && a.team !== teamFilter) return;
+      if(!byUser[a.userId]) byUser[a.userId] = {score:0, total:0, attempts:0};
+      byUser[a.userId].score += a.score;
+      byUser[a.userId].total += a.total;
+      byUser[a.userId].attempts += 1;
+    });
+    var rows = Object.keys(byUser).map(function(userId){
+      var u = state.data.users.find(function(x){return x.id===userId;});
+      if(!u) return null;
+      var agg = byUser[userId];
+      return {user:u, score:agg.score, total:agg.total, pct: agg.total ? Math.round(agg.score/agg.total*100) : 0, attempts:agg.attempts};
+    }).filter(Boolean);
+    rows.sort(function(a,b){ if(b.pct!==a.pct) return b.pct-a.pct; return b.score-a.score; });
+    return rows;
+  }
+
+  /* ================= RENDER ROOT ================= */
+  function render(){
+    var root = document.getElementById('app');
+    root.innerHTML = '';
+
+    if(!state.currentUserId){
+      root.appendChild(renderLogin());
+      return;
+    }
+    var user = currentUser();
+    if(!user){ state.currentUserId = null; sessionSet(SESSION_KEY,''); render(); return; }
+
+    var shell = document.createElement('div');
+    shell.className = 'shell';
+    shell.appendChild(renderTopbar());
+
+    if(user.role !== 'Admin' && anyUnseenKnowledgeUpdateLive()){
+      shell.appendChild(renderMandatoryKnowledgeGate());
+      root.appendChild(shell);
+      return;
+    }
+
+    if(user.role === 'Admin'){
+      if(state.tab === 'users') shell.appendChild(renderUserManagement());
+      else if(state.tab === 'teams') shell.appendChild(renderTeamManagement());
+      else if(state.tab === 'quizmgmt') shell.appendChild(renderQuizManagement());
+      else if(state.tab === 'disputes') shell.appendChild(renderDisputeManagement());
+      else if(state.tab === 'knowledge') shell.appendChild(renderKnowledgeUpdatesAdmin());
+      else if(state.tab === 'reports') shell.appendChild(renderReports(null));
+      else if(state.tab === 'backup') shell.appendChild(renderBackupRestore());
+      else shell.appendChild(renderUserManagement());
+    }else if(user.role === 'Management'){
+      shell.appendChild(renderReports(null));
+    }else if(user.role === 'Team Leader'){
+      shell.appendChild(renderLeaderTabs());
+      if(state.tab === 'teamdash') shell.appendChild(renderReports(user.team));
+      else if(state.tab === 'password') shell.appendChild(renderChangePassword());
+      else shell.appendChild(renderReports(user.team));
+    }else{
+      shell.appendChild(renderUserTabs());
+      if(state.tab === 'quiz') shell.appendChild(renderUserQuizHome());
+      else if(state.tab === 'history') shell.appendChild(renderUserHistory());
+      else if(state.tab === 'password') shell.appendChild(renderChangePassword());
+      else shell.appendChild(renderUserQuizHome());
+    }
+
+    root.appendChild(shell);
+    if(state.quizSession) root.appendChild(renderQuizModal());
+    if(state.viewingAttemptId) root.appendChild(renderAttemptDetailModal());
+    if(state.viewingKuId) root.appendChild(renderKnowledgeUpdateViewModal());
+  }
+
+  /* ================= LOGIN ================= */
+  function renderLogin(){
+    var wrap = document.createElement('div');
+    wrap.className = 'login-wrap';
+    var card = document.createElement('div');
+    card.className = 'login-card';
+
+    card.innerHTML =
+      '<div class="login-logo"><img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/7QCEUGhvdG9zaG9wIDMuMAA4QklNBAQAAAAAAGgcAigAYkZCTUQwYTAwMGExYjAyMDAwMDI0MTIwMDAwNTUxYzAwMDBlOTI1MDAwMDE4MmUwMDAwMmYzNjAwMDAzNDRiMDAwMDk4NTIwMDAwNmU1ODAwMDA2YTVjMDAwMGZjNzEwMDAwAP/bAIQABQYGCwgLCwsLCw0LCwsNDg4NDQ4ODw0ODg4NDxAQEBEREBAQEA8TEhMPEBETFBQTERMWFhYTFhUVFhkWGRYWEgEFBQUKBwoICQkICwgKCAsKCgkJCgoMCQoJCgkMDQsKCwsKCw0MCwsICwsMDAwNDQwMDQoLCg0MDQ0MExQTExOc/8IAEQgDIAMgAwEiAAIRAQMRAf/EAOYAAQACAwEBAAAAAAAAAAAAAAAFBgEDBAIHEAABAwMCBQQDAQADAQAAAAACAAEDBBAREhQFEyAxMiEzUGAiMEAVI0GggBEAAQIDBAUICQIEBgMAAAAAAQACAwQRBRIhMRAzQVGRExQiMlNhcYEgQEJQUnKhsfAVMCNUwdFigIKQ4fGSorISAAECAwUGBgAFBAMAAAAAAAEAEQIQISAxMnGBEkFRYZGhIjBQYLHBQNHh8PEDQlJiE4CgEwABAwEGBQQDAQEBAQAAAAABABEhMRBBUWFx8IGRobHRIFDB8UBg4TCAoJD/2gAMAwEAAgEDAQAAAesU29AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADfnxoWDn6eaHWHznzA930Hb3xvzKWue7ZqraV27+aowH02O4++ldl71581bzdYvdpqHD9WjdO/5wsNfi5jA09AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC1wf0CWhOvzq2zcB42Y5sZ3+9Xg27PPr1jRxybxnx7a/WNjVty5ueQj9fvp09XvPng45jX42fOeX6l5jpX5pu+l+c+fnkZ9OonJ2RgjpYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATG3TbJHRvtFO240dGzxq2mWMgAA8exjIa/fN58Z3bPT1jx65OvGcnHnHX581fTt29NXjIic9+CMlwx6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE7t0R9rnsT1cj6xe9ezTGdXV73acjbrAAAAAAAAGBnn2YbNW0RHvv2a9nDBWnl17fm+rOKzbg8ewAAAAAAAAAAAAAAAAAAAAAAAAAAAAB3etfTeOfrsdW28vZF9PL3btO/14D0AAAAAAGDLR6w2jJ59ADXz9fnznXtj+/DTGclQjpTxjOIKxhj0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAsdcbueRl6/fe+MlMk7AAAAAAAAAODvec8PT68s7WM+vLGRqznX5zv5unDHz3vsvHHSVb5r1ux6+Y6/psRzdlJ6L31Z8/MkxDxssGvcAAAAAAAAAAAAAAAAAAAAAAAAAAGTM/Ze+LhrRnZN1/I36QADx4w3Gk3NG8DIAA882Hrxt0+PW7xzdeM9DGdvgA07sHjA9a/GMZ6PXhnHiHnXj3Rq/9U+ZQdg0CNlwAAAAAAAAAAAAAAAAAAAAAAAAAJO0wW6Wg7ghp6XhQ268HFh2uHm8e5fXp5CUzo1Z89mefo9YwzqNoy5/PnZ49b84z68hkxkAPHP48Z7tG316xjPj0ZGUXC2eP5enbmv8AvVtnMQnrLzUyDsQc/UAAAAAAAAAAAAAAAAAAAAAAAAALHu5q5sl+zdonpH5pepeElHLu7eHaPWMNejzndy9fvDVu1Mtzx79YYyGncwxy9WnGc7sc2XU162OgZAadnrT5bnJuZ06u/TjO9x9nrz49mQGnxtrWjdzVq5QENORIjZgAAAAAAAAAAAAAAAAAAAAAAAABfKX9Ll4Pb61bZmB8wc5jz6jpH3j1jPF2Yy8bOdhu0+9OM9mp7zji6NmcNfrljPHuwY1+9uv3p2cuM9jRlj3q09GPWPezGfOMQEpr2dOOXv8AfjHo944e7Tt8s4y9APHqO5NOzxDduY+TqCw8kbLRI5e0AAAAAAAAAAAAAAAAAAAAAAABnDPm0W3533zMBeMat8tDHJjGe3zydWXvVs58uXtz895Oq8VGMmuLvkp7h65GL6Ofdx7dXVpr1i1bY+XiZb15j4/q1ad3dHSkV6xNast2nX28vQxVt/X44+2Z28fb3cOGOE6setGHT7c3rHS84y96dzDx7Yy1VK41fi7aeK1bQAAAAAAAAAAAAAAAAAAAAAAAAPVnq/T1cX0nTXoiYgr37jYfbplZej7efpm+759s0dFqp8zH6d8hK8uOrltfvl0ycTwSdSsXJ180hG8WPUvjVI7dOjxEduvZ38nd42au3xya9niR28vHnz3cUX45eqb66jP+/Pbvj9G7TM40Y96+iO9afGyT5YvOv3I7OHu9+Ovxqxt15gojkipeNELYAx6AAAAAAAAAAAAAAAAAAAAAAAAAAleHQ26M4NW3ODJIxz1rlt8E26bTsqTbqnJCpvPqa7KyZ+iyfyeyyEVZO33mUiQ941PVJ5t/ZXOVX7O36GnodXKPe3nMdnN4Zeu3gMJCPYzZ5GsR/fGzdw+Z+vPqagzk7g1bwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGzW9efquyMk7ZScjZ5rNMmYWs2oOOQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAv83X7BaqaHRz/ADiMlIup3INPQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABdrHXLHaadkdPN88iJyDqtwDn6gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL1Pw01aqYHRoo1es9YrFsDk7gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB2+9V+7mbZSw94qFUuFPrVpDikQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHRosG/lza+brn611IvZ0c8ghY3VttFe1WDXs+Z+LfU4SxeBy9gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHX55mzTvzzmZiM1M+OrlPG1t1MZsnLDY6eP15ObsDHoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM4AAAAAAAADGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHdy/Su6Nj5DrT1b5XW9+eR1jkdY5HVCa9mKQuERN8lk6ktC8jrpvn1prxXbUGneAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAZ6/evjSrZqinbxa9h19frzEpZ68xKWESlhEpYevoNOuM5XnP0Vnp5JlSUfI3ZSWV2UkTlQk8cMhOzNKx1cV3Ul78dtclnBKRKWad8SlhEpYRKWESlhEpYRKWESlhEpYRKWESlhEpYRKWESlhEpYRKWwRTdp07wx6AAAAAAAAAAAAAASL6HIxPDJk9Xcj15xxdrzmOkQyPeAwDIMAyADAAAMgwAADIAAMAAyDAMgAwAAAADIMPnsPMQ9VuIaOkAAAAAAAAAAAAAdfrxepQttKxVZL5/HSkkjUPOWS1/MO/tj/pbXsnq7imXOg8MhyT1Rs0XL3QWOsVOAl6zXLNbLbSbtLQys2ao+vMIj7NB2GJXV3R9KbIuPkvqHVyddmqePmv0n5PGS0g4N0VMdDR5zjp2Rjz7+kSPy36BOV2TiZV28PzfFopNfsvdL1iex6vgslWrlXsVOr9knb582+k90ciZaF6+KoI9WrZII8zIY55fdz8KY87dERnfFauj6vnGbLU+X59f/mMRNbNZDT4YyAAAAAAAAAAAAAl4iY3830IWuneNHTnzmCqv0bxx9vylLxFfs98na1ZbLU1Bv1B5uqEs1Zs0VM3QWep0us2as1i2WO7Um7TEFmo22pe/NTudMucRNWcWOsUCEm4SrW/6Z216w2Kq4+UfWIPm66T9Qh5vOMR8jHdPJ82FUurfonN3PapPi7bPUVRt3Dr2/NJ6Bnq/Zr4LRUatTrjTq3aJD6T82+kyEbmFmoXt4Pn4qlzWn1bpmA17M4mITLxkzydbDI9OT5h9P8AmEJPBETgAAAAAAAAAAAAADs43rxbFTdfFbO2jZ96/rLx7sNZifnf1D5fCT9zs1Zs0lFKDfqDz9MJZqzZoqZugs9TpdZs1ZrFssd2pN2mIJUrbUvfmp3OmXOImrOLHWKBCTcJVbh1/Rfl/Vv5vp6tyc3XpHMdIbdWY6RjvPv5sb6pcpy7ad1nqJopLN4h6N4jJbdMQM7yd19FnqVWp1xp1btEh9J+bfSZCNzCzUL28Hz/AKOecrVqvWwtdO10aZpMPNvfhETliufyqxysNdxNwPJ8w+n/ADCEngiJwAAAAAAAAAAAAAADZ2cX0DujahY7EloVlp7eGL+fyMdW7Vc7NWbNN19Qb9QefphLNWbNFTN0FnqdLrNmrNYtlju1Ju0xBKlbal781O11STg7B9HFnqVKrX035xAWTSI2WD15kPpMDPWKqoeYp+zXVpyDn4Cx3sWmpVWn/TK/DTdTSkZFzOJ6Bntmm+C01GrU6406t2iQ+k/NvpMhG5hZqF7eD5/PwEhW7R9KFrqFVp/075/BWDhEXMtmtnz9ZzjNvpHJ8w+n/MIWeCInAAAAAAAAAAAAAAAHRzvXj6b1/MNszA3mlRrh7w4pK52as2a0U9Qb9QefphLNWbNFTN0FnqdLrNmrNYtlju1Ju0xBKlbal781MVq232c+WfQLBWJPg73dG0rTe3H30awTONmrOcc3Ty+fm3ZHV6zJqFcnb9W9/LJeagbzXoWX9eNU3oqfnNl1WD31cfodXPVqdcadW7RIfSfm30mQjcws1C9vB8/FUud7nfll0n61YRJRWr5v9M+ZxUxxCFsH1nOM2+j8nzD6f8whZ4IicAAAAAAAAAAAAAAAAAAAuVm+V7JaD+n0OM069vmy1rZx9/1R8uS0LPVrZriZqxXb5Vt7o76fU65rzjWIqabNbPm12P5ikYv6w+W56eP6jq+Z6cerrUuZHyYcvaAB1fTflF0loOy06ZpPRzWyf+U7Obq+qPlzfotNP2a4uY7/AKR8p3dPJ9RhaT4382oQ88BIStadPJaK7pefQaej6vn5cmq99H+Y79HDIhxSIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/9oACAEBAAEFAv8A3/jARII3J2oixDRszBQsqqnaOzATpqWR0NCS2JJ6Y2RNp+pAGt46Msy0hCo6PLbV2MoxJM2EwM1jNxaM9aOPUwUYimDSslllz8EpKcTTUT/UaSAmezjm2egmyxM7dJO7IMomXMdNKympxJHCQLC5ZJoDdS0xR/SoGfUyF831fkT4QmxdTpnvMOWa2EQZWnKYGazvhE2tp4OU/wBIpxYRd74/S93fFiHV+h6zSmmCRP8AR6eDmJnJO2UP7pAY2jZ2az/jdzw+UdY4FUStI/0OOJzeOkEUVOLsNEbqOmFmBsf0O2UUIo6YCTQiyejEGLH0Glp+Z0ZTfzA+U98Xkxpf6BS41RthrN6/1OhyhfNiJgaoi5rfPxQvIooWBrSQakA6W/hEtSz+nXpdVeUxO30AKzQM02t6LX/JKuUyZul3TPm0haW9SN6txfVLItsbLDtflvj5wI3NU4OA/wArPnpwmvJExoaUWTtgc+nkioRdDSgykIRao5b/ADkcMkab+VwZ0ANG2pDn9WLkWEes0dHp+apqbW0cAxrP6e1iQ5/T5IcomymhYUz9LFnoE2JmHDZ6C7GLi/y0MHMUFK0a7Jnz+h3x+kiwpM4/TnFnHpnzjmYaE9bDMJOUmHOYY3rTEvmIalgbfuoqrWXQTOiYkLmmy6liEn0+mXQ5v65s7Pqds/pkkYGb827Wd8dBKSFzaOKUVLBIShpTZ6uD5oR1ODgDdZEwtp1IWx1vYz0oW9Ot+jR6xHm+OgnWNSqaZO2PloacJE9K4lJRuyGN9UDhg5GFM+bs6kYnTjm2VqTPnrIWezkmWr16dTJh0rFmFmcCz1nWOCGtF1VkxF8rT0+kb8j1CHCazvlM2LjIxWwgkZ0+Uz56c+tnQosprZXdaWvr/Prlq+W9VIMny8ZaSEmJmHH6CLSiyibLCzAmJnti0no0UhMTtfKZsJ0HqhFhu8krqQVGGnocWfqkhY1rkZpKQiQ0DKSkLUdM4/KwUaZsWbq1NlyfXlSuzNo5rwUrgm7In9cejj6HkLSngRk1KQvR2fXnCmxpYxa29/Ldfg3a+Uxs/UXa2WVcL/KvUFmJzkcM4UmV+TixrNsZTutaeUneP1Z8kAM7Mo5daqKjSYFqWddqqXQMEv8Axk/pTy63Nsp3yhiEVjK2gZ2zLX621ODZTBi3/fXWStj5RmyoabS+FJJobGU74YWd3dVE7MMJM41WWUYa3GhJRUvLJmxYgIHAsouTI5RqATFVT4EcSCMSkwLQfm6Z165RSMK3QYOZhQvlGbD0yE7O6MtKbJLU+bcxs1cGpvlRkdkVYzjNLramm1tWH+dW7O++fST/AIwzPG+51EwnGTTSAo6widjy8xOzBUmCp9DrZsxTHIxwVOpShrGhLDy5CScNYU8egKjVpp4nBj1JonRUoOnpPx2jJmEQcwdBMAppGdFIIrngqh9IUsuRllZ3p/RYQGxsfaoJmcKghf5ilfByeXSMjrUYpqshUFU+Za1b00NS/LjqTyNc+WqQe3JbXfCd8KWtRykdtX4rmvpd8rmOucSd8pnw71BvaGXQ9KeqSqn0tDVODHJpaaQZPpdJUY6pZ+Z++CRgfObZ+mC+Hb16K6TDfX6Z8hetLJ/X6L271XufX6HwvVe59foPG9Z7n1+g8b1vn9fofC9f5/X6Nv8AjvX9/r8I6RvxD6/DHrLorxd/rsYa35cIqOMR6XbKmoxdELj9bCjQhGK5g452VJMMakqWEf8AQQ1/qxCamo3dELt9ZjlcFzHy5u7nI5qOYY0ROTgeLiTihqHkbmtKz+n/AM9xQvIgowFcoVyhXKFcoVyhXKFcoVyhXKFTFHGxFqenpFyhXKFcoVUyj9SFsvFGwN+moqWjTu5vT0unoqarP1OjbMlikYVzwXPBc8FzwXPBc8FUVeF3VOMca54LngueCqarV9FGA3W0kW0kRQG1ghI1tJFtJFtJFtJFtJFtJFtJFtJFtJFSwGBWrISNbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSRbSREDi/wEMDyKKnEOk4RNQw8v5ys9z++CHmOIsLfQqz3P76aLQNpq3C3Mi3MijrnZBIxteqmIT3BqjlIntWSkL7g1RykRWrZHBbg1uDW4Nbg1uDW4NR+Ntwa3BrcGtwa3BrcGmqTZQzNI1qgCdufItwa3BqklIjtWm4tuDUE5udqonENwa3BrcGtwa3BrcGtwa3BrcGtwd5HwO4NETl/fCOorVZ6Q6IZnjdnzet81w/vbiHdUHlbiFqSETbaRraRqqBgJRePRyyXLJaCuBuDwztI1qml1p2xah87cQ7Kn87Vvt9AxuSahN1/nunoHRUhinbF5fH4Cj9yztlPELo6MCU1OUd6Ishat81w/vbiHdUHlbiFqDxtW+4oXyFn9FG2StUeFwNweCdpGtXR2ofO3EOyp/O1b7d4KPKYcdMkQneXx+Ao/c6XbKqYOW6oPG1b5rh/e3EO6oPK3ELcP8bVvuKikyNpKMTeKlEHtUeF4KRzUcIheYNYqh87cQ7Kn87Vvt2o6foys9Mvj8BFJyy/0F/oL/QUVYxvapDUCoPG1b5rh/e3EO6oPK3ELcP8AG1b7iik5bxyMbdNR4WpKfV0OTMjrAZG+XofO3EOyp/O1b7ajHWTNizvhT1blZndlDWuyZ83l8fhGTWPsqDxtW+a4f3txDuqDytxC3D/G1b7lo5XjQVwutwC3AXqPBAOpxHSyM2FpawiTvm9D524h2VP52rfbVC352rjwPRRTYe0vj8CIuS25pqU3UFJovVnpBUHjat81w/vbiHdUHlbiFuHvevD16acNR2q3xGqJvztXv6dFD524h2VP52rfbVD52r29OgXw9pfH4FnwqefmNci0qebmOqDxtW+a4f3txDuqDytxC1Meg7TR8wTBxfopYNDWrztQedpIWkRUCOlMU9qHztxDsqfztW+2qc9J2kjY2lgKPrl8fgo5HB45GkZSVAgpqh5L0Hjat81w/vbiHdUHlbiF6WbmNaWAZEVAS2JpqE1DSjHeSRgYy1OqMmE7ZR1wsm4gmcJWKiB1BSvGVuIdlT+dq327Us+tr6VP59Evj8GEpAinMumg8bVvmuH97cQ7qg8rcQuBuDwztJ+g5GBp5+a9xNxQ1psp6p5FDRsyKkB1605s+ejiHZU/nat9uwk4qCrY+ifz6JfH4mg8bVvmqDvav7qg8rcQ6GfCirkMol0EbMpK0WUkrn1w+duId6eoHTm9f2VP52rPb6AqDBNXkt+6MtT9Evj8SxOy5hLmEnfNmd2XMJcwk7u9md2XMJcwk5O/XrdcwlzC/XDWM7HVAylk5jpidlzCXMJOTvZlzCXMJObv+vmEuYS5hf8Avi//2gAIAQMBAT8B/wBghzg0VOSE9DLrt4Iz8PEB2I/M0+2DTotxUS1nnq9EIzMXF189L8opa07rKPJcR9U61nmt0DzTbQjGuI+ig2ua9NuHcoMyyJUNNae6LUmSP4Y25/8AWj+ipt0A00tOzKu1Vp3pkS6atJam2wQMW1KNsPPshSM/ynRf1tnf7kjRhDBcck81JJ2+f7GzPHSBVQoDoho0YqHZzXtB1b033BGjiE0ucpi0XxcuiO7+6hTsSHWjs96dFLq1Na/u8q4ZONfFQph4ODj0qV3pgoB6/EiBgvON0Kcj8q4kZJtNpoj+zT0KpwpszUnJF4ERr7rh5pvf6/Gl2xqXhUNVoFkKHybbvht/aBoiT5egFzqG6l5nVFLuzNNtFzOoxrQoVrD220+qfa9SLjKqDE5QVoW+PrsxabYdWjpEKNGMTEgV/b7q4I02Y+j9NDXXdmKs2adFvB5yy9cmmzEUuaBRvlkokMswcKHQArneE0CuJ4Yqnf6GVPRu7dnoQXjAOyqjAZeI5QUOWOSbBh3w0xKjeN+xS0uILQK3vW5iYELF2SdPwzgHdbJ2xTkvyeIeYhP5miDnTRTyVaePojvWfpVzr5IimmFCc/qjEcVIxYjSIcRv+r1u14jhdb7J0NeW+ac4nNBU+qA4rLQIdQSNmgBUWXjoMOlKnPdijhloOzSGXqUPHBQXQId19/pt3Vx4pk7DdTpdb1ublYrunEeAPt3IhXVTRAl+WywpTzJK5qZZt6uJ+/gozy+riRWv55IDPDJOhOYGnY7FP2b/AMoms6F67maKGCGuIGWfH+6Gw8Uad6c+CaUBwp/14ooCvpSFeVZQV3+tzcJ8QdF1BuUKQe4i8KCqbLOL7mV2q5g94a5vtbMrqNmVh9E9IE+alWmC1zTRrrtW/ncoro8QO6TS2mylEG1IG9R4JaOljuc3b4oMvkBkTAD28vBHoxBfFMRl91Eh3XuYHYZt79qBFw49KtPLNXBdLq45Bu3/AKQbUZgfdNgwqCrnV8KKNCYALpLjXcVyZp1TXw2K6d2KZDNQCM8MeC5AhxBFaZ+CcKEjh/RUxpkVLSTxdiMOPwnb/wB+uiDR5f8AEKaYkIPzXNGnMNPgLq/TYd69T/TsT5BhpRobiE6QhuJ6ICmrLuNvMN6iLiaY5aIEuYp7hSvmVBkocMYCp+LanQw6lQnQmup0eqjCaRS6mwWtybdToLSaltSokJrwQciuYB8WtOg0D88lHsxr3Ajo/F3qBA5IUBw9yuFQQojbrnDcdFnwg2E3/F0veE0KRInzHRK6uH8o+3vCc1kT5jokjWFD8B7wmjWJE+Y6LOP8Fnu+K+41xOQTjUk79FmO/hN8/v7umYzYYxdQnq7foo8Z0Ta93j/YLknYCmJ2beCZJxH5MQbFliD0m/b+ylZsRRn0va928g3E3cXIQWgg3eqmS7WEu2u9pNYASR7Sc0EUKEi0EkdHa2ns/wDHch7oqqjeqjeqjeq96qqqo3+6rQnORADes5PjPcalxV871fO9XzvUMPiG62pKF2SbVxvPds/NijTLohqSpeG+M6gKl4AhNoPcLojWdZ11c7hdo3iE2K12TrydMsGBiNB8Qudwu0bxC53C7RvELncLtG8Qudwu0bxCtKIHxKtNRRQWB7gHG6PiXMYX8w3iFzGF/MN4hcxhfzDeIUvyMEUbEbe+KoUWWhvJc6ZBPiFzGF/MN4hQHwILaNiN4hc7hdo3iFzuF2jeIXO4XaN4hc7hdo3iFzuF2jeIXO4XaN4hc7hdo3iFzuF2jeIXO4XaN4hc7hdo3iFzuF2jeIXO4XaN4hc7hdo3iFzuF2jeIXO4XaN4hc7hdo3iECHCoy9Qn5/kui3rf/KfEL8SanQHEZGhTnFxqTj69J6qH8o/fiOuNc74VEffJccyrNlGxKvfiBk1c2h9m3gFN2a0guhi6RwKyVmMDolHC9gp+AxsJxDBw79EhAY6E0lg4d6tFobFcAKZKQaHRWAiox+ymOSgtvGEKeAXP4HY/QKHDhvYHCGOl3BPzKsmG1/KXhey/qnQoTc2tHkFcg7m/RGWhn2G8FOyJgmo6v2TXXSCpV0KOOo297TaBTkBghxCGDLdos2C10IFzA7PZ3q1GBj2hou4KXFXsB3hc3Z8DeAXN4fwN4BRDAZ1rg4LnEt/h/8AH/hNbAeDdDTw0WTDa+/eaCgABQfvzmqifKftoDiNql7QiQjneHeoMURWhwyKnG0ixAN6snW+RVoal/5t0WfqWfm1WnrXeSs7XM8/sVauq4aJPVQ/lCmGXHvHerPmhALr2TlPzQjuF3JqhdZviEFMRWMaeUyUUtvG5l3qVi8nEa7Zt8FO6p/hosvVDz+6tjrt+VSush/MNFoWgaljD8zkTVUQNMjQ6LGyieXqD2B4LTk5fpkH4fqf7qJZkK6aC6fE6LHcSHjcVO62J4qydb5FWhqX/m3RZ+pZ+bVaetd5Kztczz+xVq6rhoktVD+UKekOW6TcHD/2T5Z7M2FFpGYooXWb4hOeGgkqZmDGcSctil5R0bq5b1CsgDrvr9FOCkFwG7RZeqHn91bHXb8qltZD+YKZiXIb3bm6LMk2uHKOFfhRYCKUU/Z4oYjBSnWbosbKJ5eoz0xEg0c0AtUe0YkQUyHcgKqzpbkmY5uxKndbE8VZOt8irQ1L/wA26LP1LPzarT1rvJWdrmef2Kn4ZfCcB+U0WXMBzLhzb9tBVoRxFfhkMFJw78Rg3Y8FPmkJ/hos+ehw2BjsDvUOO1/Vc0qe1UTw0WXqh5/dWx12/KpbWQ/mCnGXoUQDdosuZbd5MmhGSBTxUEHRY2UTy9RewOBack+yHXjRwu/VStnNg4npHfondbE8VZOt8irQ1L/zbos/Us/NqtPWu8lZ2uZ5/Y6LQkjDJc0dE/RNcW4g0KFpxRhUcFFnokTAuw7kBXJWfJ8iLx6zvp3KPB5VhbvUWyHt6pDvohKsgi9HzPVaEIcKNXkqse32fiXOolCwuqDv0WXqh5/dWv12/KpXWQ/mGiekCwlzBVv2/wCNFkHpu+VOyKKsbKJ5eqzFluiPc4O6yk7OdBfeLq4KZg8qwsBpVfo7vj+ilYJhMDCa0U1Zrozy4OopWzHQnteXVu/20OaCKFRrJa7FpufZfo7vj+ibYx2xPopeRZByFT8XoWtLOddc0XqKzZZ18OIuhqj2ReJLX0qv0d3x/RSkAwWBpNVOyBjuBDqUCg2U5jmuvZHTEkoT8SwKDKMhGrBRFfo7vj+ikZQwL1TW9/n9/9oACAECAQE/Af8AYIALjQLmkQCt1CTfgaZ/mSbZeOLsFDsxo6xqhLw8G3clMWeXO6PRCbZrRS8T5IyMIUUWzBToHHvUSA6HS8KV90WfLg9M7NH9VXQW6XDbu2LPbRPh3xR1CnWWCetgv0tvxFTklc6TOr7khQi80GahtoABsVfTqa5YKmglRYzYeZT50tcR12o+4IUIxCGhQZBsPPEqJKMfSoyTYQbSgp+7yQObRRRYDSMhhwTzj6+xhfgBUqVgcm0A5p9dgqm/s19CiDq+IU1NhpLHNqEfX4UYwq3TiVJNfEffNfH9oiqAHoFc2e2t13WxqjIB3WcSVEsw+ya/RNszAlzqKIy4aVveHrsCz3PoTgCoMIQxQHD0KooH0Ko76YoEnPD0d2hzL23BT8u2HQtHrks6CwAk1d5pjw7qmo0FX+4pxNMB/RV7kNO/0b2zb6EaGcS3NCM+6OiajPvRixLhcG49/wBVMRjFNSKetwYJi4DNNk34kt6uzapWOX4FoaAq9+glUr4eiVl6Ne5U3eaBrpixAwdI4FTbIZF9h/0+t2YwGp2hBOYCg0BEaD9Fmqd6MS6QNBVUMfDQIla0GW/BDHMaBt0mJdrUYd2KjNjRLzbvRO+n9E6Ue2vRy9blpiGzosaa/fvQNVezwQOiNH5HPGtfJGYEd1KYD7KE0NwAwoichvTYjXFw2twTNu78qnP6d29kKp5FWiuaO0JtaIMi41O9NRNFU+jOgXHVNPW5aI1p6Qqok60A3TU0Rjtay/neQnWtLgdm3OqFodPEYUCmHCKQRUtr0vzvUNsFhbgQ7vrVFwooEUOPRNN7T/RXrgJczEn2fuhiw3DVMdea15HzfZUJeMOjSvmr3SugeJ/NqLqd6dGiY0aONVCiuJN4UHiuUxzFFeG9PeKE1y3LlwWg1pXJNNQDxVdqmJtpqx48xs9dMSrA3ca6WPLVzlwyJ4rnz7tK/wCramTjxtrgU2ce32lLWheNHC7VBoFcM9EeMIY7zVRZp8Q4nDcg8hNeRXpZoRHDanRHHamxSBStE2IWkEZhCcLYdPadVQZ9zAQelu7lFi38dvuVpoaqG68Ad+idi3ojv8OHvCWPQZ4DRMdd/ifv7wldWzw0TQ/iP8T7wlh0GeA0Tw/iO93w23iAMymtoAN2i0B/Ed5fb3dAgl5yqPzaoMIM2MHh/dcoMTXAJ82xublWFH3H7qYljDOWHu3lHYY4BGI41Fc0+MSANgRdWldiBINQjNuIocd9dv8Ayj7poqKioqaKe6pKV5U1OQTYLW5NCuDcrg3K4NyiXWCppRGs06jRdYFClmsFAFGeyEKkKNFMQ19wthudkKrm0TszwKdDcM20TYDziGkjwXNonZngVzaJ2Z4Fc2idmeBXNonZngVIMLWUIoaqM4sBLReO5c8i9ieBXPIvYngVzyL2J4FRuVimpaafDQqHHiMFBBw8CueRexPAqM2LFNS08CubROzPArm0TszwK5tE7M8CubROzPArm0TszwK5tE7M8CubROzPArm0TszwK5tE7M8CubROzPArm0TszwK5tE7M8CubROzPArm0TszwK5tE7M8CubRPgPAoimB9Qk5PlOk7q/dMYG5CmhzQcxVNbdwGXr0z13+J/fY285o3pjLoA3KfmSyjW4Fcu/4zxUraDgaPNRotBxazA0xUnFc6I0Fx46JyK5sRwDjxUi6sMEmqnTSG4g7vuoJiRXXQ88SuZRe0+pT3vY4tLzh3lMyCtN5bcoaZoRYhyLvqr0Xe76oTDx7R4qUnBEFD1vunNvAhTLYkI9Z1NjqqViuL2guOe/RPRXNiEAnYrOeXNNTXFTBox/gVy7/jPFcs/wCN3FM5Z2V48VyEx38UTFYReLhxQVpxC0toaImuJ/fltZD8RoLQcwo0iyJkKFRIZYS05hShrDZXcrS1fmpHWt0T2tcrP1Y81P6p3l91ZusHnomdY/xUB15jT3KeljFAu5hSMsYQN7MqL1XeB0QIb3OFzNQq0F7NTMPlGEKV1rfHRaGtPkrL6rvFTPUf4HRJSWT3jwCAoqotBzGi1c2+oNddIIzC5/F+L6BQ7QiVFTXyQVqNoWlSerarS1fmpHWt0T2tcrP1Y81P6p3l91Z2sHnomtZE8VKTnJYHFqbMMd7QTXg5Gqi9V3gUBeNApaAITaDPao8y2Fnmolpk9UUUqaxWnv0WhrT5Ky+q7xUz1H+BUu2+9o3nRaE0QbjTTer5G1SU6ahrzWvV0Wrm31GUgsi4EkFQZBkPHM96Jop2Pyj8MmqT1bVaWr81I61uie1rlZ+rHmp/VO8vupN9yI0nRaEAtdeGR++gKRgmGzHMqbiXGO4cVJisRvjonZR73XhiE+E5ubaKU1jfHRaGtPkrL6rvFTPUf4FSzrsRvjotGXN6+BgVRMNCKIK1c2+otfdNRmmWmLoqDVTE86Lh1Rok9W1Wlq/NSOtbonta5Wfqx5qf1TvL76JKbEQXT1h9U5odgRUI2fDOwqHJsZiBiiaYlTs1ypoOqFCiXHB25Q7TaesLv1RmXRTdhZD2k58SFTlKPaVzZlQ4Ch7tFoa0+Ssvqu8VM9R/gdEnOhwDXHH76LTHRb4puYQVq5t9Vg2gGNDbuSmp0RW3QKKXi8m4OOxfqo+FTEXlHFw2qWnhDbdu1UxPiI0tu0roBpiFCtJzc8V+qj4U61Rsb9VGm3xczh8PoWbHa2rSaVU/Hbcug1JUK0y0AFtaL9VHwqZjcq4upRSk4IIIIqotpB4LbuY0smojMnKJMviCjjVBC1B8Km5nlqUFKf5/f//aAAgBAQIGPwL/AN/9yYK8LxCq8ScScB07KpburwsKY+0mC8VyO8LxeFBqhVDypJ07Jkd7poaI0orkzXyqKo9uftERfz5N7KEDrfus0Dqv6ywlHleuERVRfK4rCVxHsoEQ7Sew3SVPKoHO61QTIQ3+yYWF9/4Csq+Qxhr9Ldr7IJ4IUzkfOY3KpeZiejTAa+TUITh/YjKtXTMy4JjVMwHD8SAbuCuVAyJJJZU9gubh6Edq72CxAI5q5pMa7/y/GVu4K5pVoFQ+wKJk7yNSE34wQ8XlSF+fsEAB+ye6i/1/CQ8zXoVl5Ls+SG096jYb04dXWHanrtAmN/4+qNH/AJVGB3LiqwreFcq3J4TXh64OG8fhrk0j53hbZPFEvQD1ok3bl8+ZS9V8ngqq+nDinAqq0Nk8pcJOme0X9X4BPefwha/zL7NH0b7X9+tO96dEcCy5IPvQr9+sbOyrkwGtnknHC5ORpwP5LfCgSr1xVQ3efKfJN5LleKHQ26LEmdgD1W5xvFFU04Ixvp60yABA8hyr794vbyBLnuVa+Y9eqajjhb4piF4Rp6vTaQ3wvuTwcEzZ5Lwqps0pxVfLyrYa3xV8ieKLhmtkEVFy4Jxw9W8W/dYJhiZ76IOdqbDXWwW3T/x5KlprD3ql9l9823Nfz8hjD/CBBu9XBThU8gc1RM7WnWyR9rKbGV6iz+Ewum2yH47mTuQy8Nx8rgeO9Ya7muWJyqlHZDBXjL1V4unktvQh3M7yqWRAjdrnTvVlW+QCbcmF6fFxyykdVDHdx0dPkv6jXxQgj4XNF6D80ADfdpKLhuQP+zHzOE2QO71VwWW1tVG5VvlRtVwK4Gb38JRR3VondbZBhP8AlC3wvCXPH+FUuZGjMgxdr4bkOLKOHf8AnK53W1we5UDuiGuuyQzWyhQSdtNy/wBRE/ZNMmKuQlu6eVs3n49VZVPT85OhJ4zkNw1lffwQbgr6EGiA4qpZX0ae0IvDvBX7Kqz9E4oWZNFUcVqhvzUXCLdzQJ/t/hGN33DcJc1ylUsnelyvHVpVsw5tMG7kmanGey9VtC8ercV/soa7qrmoRwvQY7ldVDM/Ui+E9ldXcnjCbZ/hEcFS/cmjDjmjFCGe9Pu4Lwu2VE0QaJEKKFQxC6KhRCATQ3leLEb14W1TxRPy3LHXRMIt7rxf1E21Rr0xIruzWzhTPcqlkK3okX9V4oquv+O971su+yf1T3snCP8ACo+0N6d35etHO1iY9lQjTZW50do/QXhrzW5RXAj7Q8SrhWKW3ZdeDqqmWzzeWzuXRcc6prhypJ0a3ye+iJN5TC89ls/KdH/Ld7L2Tpaj4NTqPPfp7PBstx9wQ5WMvcA1+bEX73e4NbEX73e4DnYPuA52NPcGtgZe4BYh9wQjlYh1+vb4HWzCeH37dZ2VY3/fJeEWarw0+Ex9tvGdkJ6Zp3ovDXVl4ihEPEsPdVDBUqnEXVMfbNGzT3nmnNVVUheLinKI3GdCyIdohUc00ZaIXH/r5TquOawhXDorh0Vw6K4dFcOiuHRYR0Vw6K4Pwk8XRYR0Vw6K4dFswgZ+0mTeU15XElPFf8WNmHr7TE6lliHVYh1WIdViHVYh1WIdU0NTxlihJzWIdViHVYh1WzDdvPsXCVh7hYe4WEyoFh7hYe4WHuFh7hYe4WHuFh7hYe4WHuE5DTGyHWHuFh7hYe4WHuFh7hYe4WHuFh7hYe4WHuFh7hYe4WHuFh7hYe4WHuFh7hYe4WHuFh7hYe4WHuFh7hYe4WHuFh7hYe4WHuFh7hYe4WHuFh7hYe4WHuFh7hYe4WHuFh7hYe4WHuFh7hYe4WHuFh7hYe4WHuEx9B5cV92ahFvXD6By3ph7DPobQ9ViWJeKqcWKFYii5eYYssRRcvScLFr1iKxFYisRWIrEUMp4liKxFYliWIq+x4SxWIrEViKYl6TDFliKhczJCxFYisRWIrEViKxFYisRWIzOSxFV/HwjnPOzy32NJRThkcpwa/Ui4eqwrCmEochZwnosJ6K49JuLDi/5npOHOUOczp82aB1uCxdliVz5WIsj6CNbFwXBcRxnlPSUU4ZHKcGv1I5z0lDkLEOc4srDhc57XWWk4c5Q5zOnzYePpaqJxZH0EW6XGRznpKKcMjlODX6kc56SbhN7k95nFlYc0HdUEyJaThzlDnM6fM9s6eVFkfQXvWDv+iwd/wBFg7/omZjM/u6RznpKKcMjlODX6kc56SdOLUWU9o3brFVxyRK0nDnKHOZ0+ZAWGFBKiaKoVJxZH0g5SOc9JRThkcpwa/UjnPSdFWixBYhOLKQHFNJyqUCrPScOcoc5nT5lpNuNnZNxunFkfQqLCVhTmpmedJHOekopwyOU4NfqUQmItLUPXpMy0mLOk4c5Q5zOnzLScNkGcWR9D52HK5bpHOekopwyOU4NfqQ50myY2XN5mIdZaTqvCVc+U9Jw5yhzmdPmQmxVetuLI+huE4lU6Llwmc56SinDI5Tg1+p8xOqoQty3LiZuUSZV4WKVVYVuK4J3o04c5Q5zOnzNjiFmLOzFkfRPCWVYjZOc9JRThkcpwa/U3C58PIcrlusULKtUwoniv4K5l+6izDnKHOZ0+ZuExobEWdmLI+lHOekopwyOU4Nfqw4Xj6qhsVLKlVW3DmJw6oAm6xDnKGZ0+bNCrgsPdE8bMWXpVCsR6rEes6LEeqxHqqyosR6rEeqqXt3nqsR6rEevl+KhV75J5UKxHqsR6qpniPVYj1V58vEeqxHqrz1/98X/2gAIAQEDAT8h/wDf8Q1YKnhBncwDpcmMOb8pauCKdJcKg8UIl43irPuqzIvDEs1wxQYOSWbCDYNcA7Q/wgACu6AeIKKobNO6LhAIwe+t0XXokzqPE8HEOikQMRX9SMCsfgP8JpZedjhTgeaJkAzLvcMkcxezRm5wzXpisKxc0iuRLKiOoOgiwgBPrAHrqUOahgNOPCGetcEyDgBDzBuuQX9DXnuaqaxhN1+9EMAwAuZ/lRwBmLgk8iG2yIkOWFqItCMAQxaXmC2ljkZAZ1XyzZebd6Ib9QIlgC4IIhg26GyEJj3ZkdrADtf5fxYSxGfevZ7DmAIjeG+UCJkliYoBFzSpHVTHX0DKl6OA3NERcGd6sAYwIJBgmR8p1jLiQHZ9UQC8wq/EOObIsE+VVq4XxchZYCgOdZa7FNGIYaVpzT2dox+HRAWmwYqiSYhub0UgaFcyWbH9KpQN1oCgZyfTCBEVomzsQ9xg8USyBdODlCBRg7zyqgi5ohr0UoRTUJvSRALSbgiMCQxvGFpXRBYuautxa9GWDwWmwAKBAxjQsiDHDtRU8DlzF6ZMHrpVBIuHDcxdp3TQdhFdDMcv0mEmB1EVnkgBnLOWGtfi0MJL1aLg1jeuFzprBi5MBUp0EGBx4LhAMn9IkYI5OgB+yDF2B6NmBRztkLEi4H5xFf0eYQCDZzQ7vVQAYAX0YlkGoULjVETIMxbUVB683/2KJC+JuTeEQvGHm2YhMkLg0vbOCVYaj45IiKlGDArwZY0ycIRuFC0db/0QMAEOCxYtzwzTtfoyjcolEHBnADxSoRQuwY48kBgDbyMZoXTgsAoGAvy/ICBBkH5QMgPhzgm53ng7JhJpiHEcECIBBkKMA+FPlGZiQMC3f9BBiimN85IBQJpjYHOMEDfilEByQXvAI7lE12HeeQm0ubLraY4BKY8UltP0ATcgKsi4VxduSYAGxdHwT3Tgp5GIdcGI5mPQoyFGk9DBjGv47X282SlJqANeBaXN6IDkshb4JFhYSYTORvUYEcD1RDODd7+fagVJdtNUznF7zxQDnAhgYsmgeQ0GIyQABQfhDBwYTabn/Ah0Rz66vpU2NCF1WAkcGRAEGRQol5Mk+/zWBWn21R2+B5lYWM3SYGv1+I4kBRnQ4eyJyCwwNHYoI9BLIID3BDEEFwaGx0AmXVSppoE2JeJgC6ChoA3eEfCDqAcKcHMjiiM+NmDGt8UGqNYDBahr5tBZWa5h76bZ7G5uKGCuHSS34pLIIOCCMp9JSJIZgAGMTjGVrSAEEHOCD1ZjkiZNI45uoYgX1hGaurBFOiJBzaB/SmYzQOLHmPtGSQez56q651nuvgU46CixGGWFqaR72A5GfBOwEMkGD6SSEZIBIY/iu0GNc3jsmigSeZfFEIaQbxn8InOasMGjOT8f4Oggx80M7ATNMURWAoiwvm08oRRJUIkvfeIGZ96HWKGHmftDKOWDsW+yg7Gj03y/wL3IUPJOt/xY4AkHCl3VGQgxwd/j/AlkSyHJgZBg1D45h1BQ+WHFHMAg6pgHq8I8wwZaYcEZgxy6vVvSEgFWPxmwhxUliG+XCoPlDA0KMwc1CZ0wdlU27vKAbr1L21PlCKrKky8Xe7ncXYv3fKMEsg4DzijgGrJoDPEEdDP+AwckADFD/AIvJyAcrQqKV44If4kKrDEguDXBp1cHo3pgcVrupB8ABAzgGyP1Jvhwf5AKEAh7xWP4eSAwSGs5eQXiMChAd9jcGavwgAAXEgAd13vD/OqScamjaBFkAC/98XoL17M3wyx9JJDMw0kGMxnlRAF15B9HqC/RPZAIwOCCzs5M9UVUMGkTyJCKLQ0erwL8SnBglcTO2QCWLQgsROZkBGQgLI9zDtbUpANrL/FpAYbqTPE9Bqp5UI0rnX/G4R3yGaFtiZgLcxVkAAYQBYCr0OIYgDmH6OE2XjGAx+RzRgAJgB0JgtjIlPieaoIOrnmeERKKRNZmwC+evvRgBU/ZT0CgTUnC+v8AgdEYCpUZJZBoLwCXvdEBnJa8lydY9JysAkypXMMfljY0udAYm5EAAnAScf8AACSGZnnRj8shaRqO1Nyp0UgiRWNwYQbSDgtIoda+ggBIDsMeaLRgG7JhXimmOECA1LnkyKTEEHMHsfdgJc4XmgOTdnT+h4AS6hMuLkYuM0v9IwDKCGMXlWiqOHmrucXl0zxOWQwcX2uPBg89EwAxKV4GWeqELACMDKARaQJl7jdnQcUxnMCsxzdAAEFwb/WyuHcA1FLGoYn4fl0QECZKLBvkE8Aw7keoiv8AmuiMBkzJE4mk4ZoELx5eLAgEsfNqIrRSLngQdPUC42O6IdPhzRFi8a6XUKcqCDUMZHj3Z6EqzcDbqgXsZHL6YBkblN3RB5JN8UJIoWQABhAFj41g0sHUINYTQB3YVsomkTvY62NZjIzzQQOHYoIbLBGAgCcy3wU2Fz3GqBd8vuwZ2NzGfh6EqshinC5RHALYPc/FOYPW9EsmKAU0BBnaUOdhMAYk4ZBLjlPqeyRtauJxDPJDZKoUM69W93nJmI5UPRCBAQbwhCwN/bCgAKR6GQZLzdCZ5IDZwDEVDuLxkn4JLxcg1wF5i68n5VAIOhRDouVEcAOxepF0TSuMILbguQXPA+ScY30cQ3yuO4QL5gojjPGRcGOQQxbvmf6yJ3AYRpCmJyQWMQzURi5coYAMFBaUaCoS4GevJAIcBIsa6oMmATsxd8XfC5vQ0uAWLjI+puNGgYM0ZQCZZy9ebwyaydaGE4NvkygSzMZU53o7IVyJibyaqrvs8pitR7q+0eHl4QIAMituHoJay8KHZNwA9zRDdkRG8aIteA3gkHpKeegli8MM24XqZnICLpT2QhLY2aoBnMNDZzyREwUMyMHrAIJlRJE4c7MF8m5Cx5hxAPRiAZxrRk0gEw+TgCLzVrkIDIhyjB66XpqdYAxIsB/g5RA6cDE8nyucROKXbgnUHKRzjR6zL3JxZ1kXCZhrkFycHJ71tdEQQMfBNeCIEAyGfjRP6RLmLsWduCFLC9KSKPLd0McK2h/o7e6nmY64FxAahhQtuji6YoxRHCBkJPVhYQAVnpB8tVkI3aWm5xhknARQeC1ASHi4s6AHjYwqAgwEGXIOaAJKJwVD3GmXyhoicUIyQsADKZkg/GEDUJAz878zIbDBUm+x4LiNmPQ8VJAOIYu06T1TJ0EBIwf+pzgACGBDsQGOtcFRBxmzZKpAXgACmVHZFIsZhaDuiG8RN2oRkYHLJHgAcAQ91xOrEoTrxGGLtWDQllEHBe2NdHZEAINCgK6bIQBGAjkbQGZuQGmRERB445Gwo0QciNHKkARL4ZobmEjk7XvL2ASrFC8TcwiGqZRyqhAxz9D2RxnMeb3U5gKksLkymdnEmemTghTc13DzKEcwTSjXlrynCRgiYUsTQSdAhAmXLLagQ7XE41TAHNyBiCN12GbFlHtgEPSKIspcLwCeodEClpc2/iOdgOaMEh1a6cxegURYXhOLksA+BUujXMeqIVaXNXOIyRiSd2Tm3d0SJcK9WheVP3MfQxBxdiM2RlwxihC8ZXFDBYWFLaUPxFyuYGGcs3BrgmuSRgYEGnyUBegktcuvb+o4gyc/5ZNi4lrpcNWfsm6rEGgUzBH8kXHBMJoJA57qgX9DT0LgdnfhdJVESq401ZzRpYcyqraKwLxfdXBB7CGITjFYsbFEMB8gLliC/l7qC2SOvqYk151R2AC4NocQcjS+FfMRBmLzuHOKCO4II0vxanNBwLDIiuLUi/NH55wfDEHVj2QhMz3ZIhfpDpLu6cAoWcTzZ6soYrkPkIfLPVBeKzqF4g0TuUQ0MzPFWMAShdguZZ4xIYh3qgtzoikV8DzncHueFIi+YX5muhTWSGCkidL7kKrLnycakPdzKPiDdKijTFO8pVAPO/JZ7jrcjENWzEH4QVSAPoDvDNYtkRqJCIYrU8S/8Thc2Yte2aMDIrl8I2wdiUDgJPRP3ZilA8BXijRc31c9jKjBvuDYlADkQ3iSgE5WTxwJdT5MvVHkobQWYhq4ZZo2QAlj5O7dlQDUQjEaSbBpqWuzRCRgkG5jjcr8CvEck/1xzZghiK0KIARYIOBYH0dkWzkBuArheMKp8Dgp8ActAeUY3IWE3JkvlWrfF6dggxHIt1lEv7wMJN4I6faJ72V7343qtj9PlntOh2dJa1Y5tN+KDog51N5oQa8QEcWqdEVQrqAxud8kyYiFW5RJdy/1HFk4YaAW1dEiJM8wKCcMAVTYceIw1RJmPu+lgExBIY506wiHtY730QxcWATcA+anDFVbPQchFnWeiw1Xlzeuq5QByDIMsSwUADuB6ItMOUA7Ai1F0YQVBccC4QkDCoa4PSx/MVP5PBtCruzAyi/QBX9QO+Dm7IIAAywJQHN+XFDnB7g4DnBBiMXgDPkZIOv6WUgdwasMvSSyOAvEGdb/AHMjckCEXxW77RcJMk97HYm7pT9MygIPIuiYCPQUYxN9BdxTs+deYPdv1/lJyj0OIwAca/P7AXM7no6gdn7AXW9Hadn7B13sPQDZrdm+P2Dr/Yegel8/sHdegJMvc+f2Bji9z6B5R+P2DKQO3oGdP6/YWO+gV8cfSMDRz8nT9dpBmO5OSeB7TToPdDaAO759IxYHBUoT8L3jgiDDEfrQBMVUDHAcPxJjugYECBk7oiAxBUJiqMQa8tIBHXkEyQE3V6BBAYS1Wxy6I4d3BDLM8BdtQwQUuAqZRyN+RNERYY/rLixxvByOrDkpBSXybR46ICKW3Gn8Rhy0FwQW6JI0f45I6I5KZkkUjPEZg2nHMW64o1KmjAJBFDvBVVCjjkEDmcFrx3H7EC2X/DJ9qBXB5OSrAftSi+sHhfXF9cX1xfXF9cX1xfWF9cUyPcYHPSmaM4zZCIwhUx6F8+F9YX1xfXFKzYAOnn9SKIKksOKAwu/yCM0cMynsX2GAQ79dtFTiRQ+Hn9T0ACfj5toW7Et3X1byvq3lfVvK+reV9W8r6t5QRdGAkDyVJyZJqT1JKBOTN7OQX1byvq3lfVvKrTuMhl37/olB7HUra8i2/IqjwJ7WD3fDtUfJW15FteRbXkW15FteRbXkW15FteRbXkUJZjLj4NpOkO8gVbErb8i2/ItvyLa8i2vItvyLa8i2vItryLa8i2vItryLa8i2/ItryLa8i2vItryLa8i2vItryLa8i2vItryLa8i2vItryLa8i2vItryLa8i2vItryLa8i2vItryLa8i2vItryLa8i2vItryLa8i2vItryLa8iaQxF0X6ewn4gKl8YlUcOcUnenppUe/lBECcEvN0N8e+dj29gM3ckvgZlDAGA/Q+x7ewMYvMnU+KWvCyW2bFEl/p8BAV/p8hUYzEQfB6J6Lj0NQoDCLOEpmAVtEpnA0s4SGD+LZ7Olwb193d3G5TeHawrPW92eWes48C8tceydQqKjC1zHBdcfCInBA1vc/iDoOotq7D8WcBCkEzaYhjHcf593d3d3cLDEi4u1mEHJz+fnJLhJ6C0pmgw5/x/S8xVRj/AFDAESDPO2ros6Id7eiPezbZ+mjM8DOgwWwT5WwT5TBGDCJs3jCw2/YvC+5eERSRcVowRiOuuSeQgiowtwvu2UQmMEVGdnddxbtMvTnUdj0m5tHmgVY5j/zqsjtqrmB1H2vmh8VRCYhjgUKWbxh7CG1gbQ1B1UOUFRA/LxRSp+FqLrY7E3yO9tXRZ0Q729EbNpnbXYt1kLamix4bGsNEDiLw/MJgYh3CATLq3b0DBGI6jPJQKAqMLRwIvb+uTWd13Fu0y9PdR2PRG4Xn4QhYAAD0gGEbd4w9h7nt6hAxoVPZLI2brIW19FnRDvb0Rs2mdtdi2WQtqaLM79pkeOFphIjVr+YVdLh7tGt6t29H9F3gK4bO+3FciNRTrZ3XcW7TL091HYtcYOj58eghigGPp3jD2FsbDNqxVj6KqhwnVLxo+NucRI6rN1kLa+izoh3t6I2bTO2uxbLIW1NFhwjxGIQARwfV1btbk9Ri1/oAuQAzKppJ7VogjAwJfmu67i3aZenuo7FmeZ6X9HTQAQB8WCAk0CJu6NTxu0RLqVIjQlERql4890MQScG+3eMPZXOGrDKgWdes3WQtr6LOiHe3ojZtM7a7FsshbU0WmnPUXFUyT5jpPRA/kQhvM7erdrG9vNwvPJAAEARysIiMAi3nHj/EWREnEk2913Fu0y9PdR2LHNJHqLTAC/Ognu3p/hQP9t3jD2IowObOwJqR5QyfYpgP7aES+Lj/ACzdZC2vos6Id7eiNm0ztrsXRD3B+LSC6EdBfenqa2BBdXgcbdcsOZ8WPaS+B82mAbiZ4D0913Fu0y9PdR2LK+vuLZjMjiRHpyYL8i6Fm8YexEMEFiJBQsMKjdx9AAJGARn7kB86mzdZC2vos6Id7eiNm0ztrsGWJONOrWhId9DgbkRAkctRl6AH1+Vxsst32unCl8WVdfcWigBdqVHZf3d/Cwaxl0r0QEQQxzizuu4t2mXp7qOxY97iW5xaZ3yIFji4KfzT0izeMPYwO664uhn6k6vsOCqN4XPK3dZC2vos6Id7eiNm0ztrtUKbp88Du+0BCbjeOKArtXHZ1vk+EVUhvRSnFN2mFpnddUWuidiwoJAOQk5jwgQb7CySjLCc9Bz/AIsoGRc8iB3TyADmKcCqa55HyoGFwYFyR4xt2mXp7qOxaJ4xMxcfNrJmAXULRSzeMPZHmorTsQv4g7N6d1kLa+izoh3t6I2bTO2u1CBmI5NgckPiArt3/wADAjAIzlAo+Tn6KsaCVdocwx6eEBAmXjHAaIcAuXAELYPYiEM63U3zCEAIoQ/P0bTL091HYtIAjEXpi+FOno6n3tFLN4w9qPawCdOquizpgnTrpjZtM06dF6Ac3GKuQ4N9uSpOeKdOnVDNRUbP05+ETc3wFw4eu8IFjM1vgmrQQAmKawgBoU6dbjKzrk6ddZ2PTWFsDPenBX43FvKym2iuEc7a2gp0fOdvaqoDQn4X3LyvuXlEJySTiXsqgjQn4X2LyvsXlVQTqT82VQRoT8L7l5X3LymFxmJJ7+sDpzi+xeV9i8okn/EFkGA2L7jmg99hL+c0cp6AYCyqA0J+F9i8r7F5VQDqT82EQXEZhfYvK+5eUCYmGBJ/z+xeV9i8ok87z/74v//aAAwDAQMCAwMAAAAQDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDCDDDCDDCDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDBAMkeyiLyVJDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD4JQ8IzHYghYYqqDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDCCAHZEc888cNF8FnALDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDLMzc8888888884xS4soDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDCImT88888888F8s80lprCDDDDDDDDDDDDDDDDDDDDDDDDDDDDCRpc88888888K88swH76BNADDDDDDDDDDDDDDDDDDDDDDDDDDDEUK8885hR8889ra88JlRXc2DDDDDDDDDDDDDDDDDDDDDDDDDDD6Q89003pJ8AW888dBDc65pRDDDDDDDDDDDDDDDDDDDDDDDDDDJb228yl6gs9usN88zAwZc8WHDDDDDDDDDDDDDDDDDDDDDDDDDDsDdVY+kGf/RWLCzmHcl881sFCDDDDDDDDDDDDDDDDDDDDDDDDH7D1cIzsbpL3XmuRcJolh8B4KDDDDDDDDDDDDDDDDDDDDDDDDDD68BOKgg5zSRR1tTbBJX1/OhSrDDDDDDDDDDDDDDDDDDDDDDDDDDCDfDDTDjwnq8j7QZRxxDO2DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDCwr8rDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDCg8KDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD88qDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDCb8LDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDBh8CDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDal1FbsCDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDiATG/wCvQwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwQggggQQgQwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwg7gQQQDfsIAgwwwwwwwwwwwwwwwwwwwwwwwwwwwwww4CBSggAAjdAgAJVwgAggAAAAAAAAAAAABAQwwwwwwwwwwwwwww3fizuMvMtPPvvvOtstPOMsvNtPPvsssvOogwwwwwwwwwwwww5lSQdgqUvM4xRgCqGh9rFzL0POlvgRFTZNWdAwwwwwwwwwwwww2vGYylPgPAASF/Kd0eZgRINCfK1AAoNMY3PQgwwwwwwwwwwwwwwQhX6/vgPAAaF/Kh951gTJERPKVAF/8AGPDz0IMMMMMMMMMMMMMMOEmWH74DwAGhfaYIQqhfyx0vylQCfR4MH30IMMMMMMMMMMMMMMMKgsLz4jwAGgCi0Ge5tLyQV/ylQALWaoFXkIMMMMMMMMMMMMMMMMIMPucA0ACIMPT/AFzCDC5wBMq9FDCBCBPDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDCCDDDDDDDCDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD/9oACAEDAwE/EP8Att/bTozDU4JiKbvdo+KCpqSMCykwQ6bwjUUGUjAaIF5XGT+Iqxjt8oqY0GYoB7hlFaD9faKCtidMCMFkATCOZgi1VRDIRU3BCF4cFFXEooQDW9n9+xguje4OJT+nfihDFEv6mEkOWZEMiUIwc1Kc95kgYAYewU9Lhe6giy9xQgc7Ujbv/OIYsgWQYkHIjVloS5ppZCtfYDkC/h06qZmGKa5b/EkD6AyEVhokEKCRT5YJzC9+eIHUDIMkcYZ/5OHRFTaYMiALmVJvQwjOXQATzRZbUhWFWX1OgCrvYR2PzCWrCJC0b3c0R1QI9DIByyIYt6AHQLyQIWzNWxiHFiuGz5VYkB+YKbuxB1JfILHL0HBxzEcxhE6IQ0IWBnPSCZyAtRGwPUG2R+Mf3UW/ONtfwQwzX/lgQAuvAdtU0NSGV1QbwEm6dSCFxYHQUABCEEyqWAsjAOBM5M5i2TARAxQeASQmNplnlDUWmXn8vXtRyT4x7u6qpEBKdUoAg33ExqRIJcBG4Qd7HFVCIDgmSehxL4ppMUWEDC0YMHv2UUzBUESgzWG5eNWp+Ub2WmyTuzTEIQBdExVAYqXg/DgpYFzQtrfB4KRIwMhmKhDHwCujtCEGub/C8IDZ8E10JsCqSyP1QKoBVAC9AWAsXsILx8n5ZKImWSUNzma5RmYdRyCM/qDvQv4A9Ox0HrztKfEFJ/JzRCEFBcgKLpuyQq+O6Bwp7ErLrIbpalBmqxqDkrfKJKHKVLeaqHDNJssUFa8RcsUDQSAcs84GQjYMTWqj/t7yVW4O2aeHEUPmT9cyFz1v/MDo7VEAyGtUKFnbnZ8RK4iPFgPi4FRxV2IYNDZ6o0VVg1UwwLGoKwng0Oa46RKx0LSIUxC8IvQIQMKQqRcCBgh3sgmw8VI+oSneTFA5zmu09lfy8FZo45Gw6kT9HuG4Nfcgtoxs2Dj3B4bXsc4vf28MCCUU9fewRE7kHh9uFMPomjUPmVOEBlEEkmLFjQMeKJAdVQOBlPbSUmdiTsIIguaIV5vk/S1VCYSCM5RJea4lU454+0EBespzWU5rKc03BzQA0LogKkBZTmgQaF/af5KhinU51Wf5rP8ANZ/mhFzKk1XqITn6XBBh2ZeAE6pzeTefYRjg4rKpkXEiZCVR6Yooqoeg0On4tUrltD5W0PlbQ+VXyLbMCL1tD5Uyi8zH8GooooooooooooooooYI50OP4HUc7VRIlmxNh1zCwKmAKp9tKMhcJRJaUkpsggPVOdgWG4HbwREhgmuQfB4IQqcQ02DCJxM0bBRQNE4SpDGSF0OR6y4Utj4S6so4xYGvLJwTnAgZeERrDPcFHAAFrinqABssEJhIrExYSBY3HiTdFdCFLAX+duVVDZQBHkED3IUg8ob0MgbVFE2hgLvwSqAQ0KAHxoms2VyQsYVs9F2tqt9lYZW1sg6kpG403RwARkjxATIt/eqBoqwiuvPBEFdOLyPjQcaqNzi+3roncrYcbIRgNQ5BVBl0/Aopv+EB4ZsbHKZAQXu6IYkK6KA2Rs9F2tqt/lYZW1thAKOLNypI5qu+sMt/xVw0HWlc4BG2CFToFLaAIO7jbdbTMrccUYBgcSiXnFGVXYLoUMdGQry/cH4Z4jOihTqkGuWgElE8WxcLI2ei7W1W/wAl1KEgjT32PqwrLKnqjk4fnmjjBUD0muA452OIPGhA34j6N1tMytxxRM5eU2DTYMr3QDQg6LKYUb/wjqKVozn+CJfFxwtjZ6LtbVb7JdSgz1W1p4R0FCvCHStRQ/hkEY2BybsV9S1AEy2NUIuZTMv3J1+0Mv8AAR6EX9xCJf23XTO5Ww4pnjFP3KSyqIpeLyXQHsqj+MYALE6YRF8DNGTHk7CIxHROKAxB1LDCHBxRs92U4HmTyIaLJZi9BMoAsQLk7vVEhneECXl2IxWTS/KeqGliyimGM0wmxnRRh0jspIdKuhcEYgoyxSNMVMvZm/7X/9oACAECAwE/EP8A4E4C8VZG8KCCQEi9qVdaoVDEQsQR5e0OYYyp3DosJRjs82P+gJFQsAmEKAKr6kexkMgcFg5DrG9NAhjugXhAFUEBsubP2Cqxip5I+X+jJwXDqqLoIHKRqcI/nnrPVZMdBzT/AIgCH9BdKFBLySWX88sSHxB/8mzIKlsuhJEJ3ZzHwZXEH5o86yA+rVCCYOnA/oLEDQ9BAC9LHdwsNA/nGw+sJewDYIsLIGc4mdCebS5AIegi7EIcTaSgCIt+CS/MkyQSE+RVkFWktVYyHCLsoCBFpDqQhUJ2E2wJQK9IEFIAcWvz8wsUfOt16ZXCpITicCAiY1ZARQgQDFBEE6JlRKIyRr03IihtewEiVpi0CwC8ksOX8oLeE7QqhGYXEE0RJuszdilu+zUDqINKN8hxTnbyx+CqEMIKgJ1fqIuQibCHFhH5eXdqMLLOjFgttbU24738JoV0AcLDGipbGLiqygqf3ocaDbbuTpLN4KtElo3bzRYz7+mURzZeFpDFss/wj+an3sKuLATaSVlOOvWf2MWHBQ4WYWiEqHkpBwtRVjFmAtUrtty/2UyYFlMFhvcCue5dN0mxj3BmLOY9vz18pirlhB7dwC2vgJNnZ3lGxQTYMoisN/mjf21AgKoRGT6TiKX0NotgP2f2mATcn4Hkn4Hkn4HknYFEhcgCbnT8DyRBGXtTOOZPL8ll+Sy/JEYMbTEnLU/sSZBj2RKjcKD+o6MIIJdzulT+RZZZz0riwDwgggggggggggggghhywPwOmSg2GNgVgcCGDH+B/Q6ceh7XtdOnTp7CfwPFA30IfQEWdkvs3qOSBdjinS/ZKOJ2BiaGVErUEfBbBb0tTV04W2/CratQL0lgr4Q6ZxVpfOzGBqa15CBdbDiKY2f7VQBSgaCwnnL8EFTAoQmy2FEIT2npJ7ZZLRNMYrCntWIxAU1G9XAF+CEbLyFg4ejK7dhYEhBgyJuI5oTU/CJF53fErxnIicBCTdCu09JPbLJ6JE5fzUMcc9dhNjj4oUCaiq/yBQ6TtejK7dgnSSAzDBACvVO5qJT+HE+tyC0AOYZBUOhXaekntlkQbyRzQL2xu4wLEUBeIthyrRkTY3qvKuESVCqYqIkKhk4sQVA0H4RNZBnxWx6Vdp6Se2WRAtZlYmUIt8yPohjQAslTCrJgb5pcRRMj0bZK7dgnZMI1wc0MNBeoCpGg/GJ/Wuxmc1YIj5ExB8Vie6FA2Xm1iFIhn0ilDsFK11kXc2gBLHKXLJ7AgjWMBJiDgg2D0Mz9mMn/ALX/AP/EAC0QAQABAwMBBwUAAwEBAAAAAAERACExQVFhECBxgZGhsfAwUGDB0UDh8aCA/9oACAEBAAE/EP8A3/O0CGRISiWHtQcqWUjdYZGhtxI0EUTXLBotr+1EluGggtyd6kbjfLg3PDopHLhUNEY8yOgfPFxI9lMVIMF0PAoSSPAF4oUtBWbfiUNEbEsDQKs73igQIwiCTcokW7ZqoLvVAhRcHwCgC1YghRQwEAEAUGJStl3Ud6MF15MS+VIPNViPblEK/DkLc8VLlWMpUuiaM4YDQnB8r0xsWJf9Kkgusr+gCgnIDMUdppb/APAbog9jouZh9k2Tml9+V0vYURIiIwjp+HgsASulRoEzAavjJ0VIMTkKyIykjoCFoApsWPd0gEkSAcux0BCJAUj1UmVuNjICoLgBvqx2CSqQhARn41qI9HFsAloCKFzAZW3CmLb8fA9QUW5ziu9x+xV0nIyGoMBmyXaAWFMogWmiUfGqorLakaE0EIU4PwoHuA3Skc3aGLWNwak0g9dAwGkNKAS2C6ulABMNSAN6XE5OipZaGYF9qmSsm5E8AaQ5Jhk47LAIBZIl2pkyiZJltPVImwbglKAhsRDZ6GwAaBagbtyRSDf+1YMnKjDESeC1MgNggO6oUSQYCwJXca0DgNNI/wCxRrgZFaWw/CTAA8S5VCsDKLTBh5Lok1fAkB6B806IcwwyVHaSLSSWmKQ5JOei0hpRgKJU1mEKYoIkSsat2gqmoC0nYVyMMOSlx2kTamVPKHwwoZ2QGv4OE5EF2Kgi66MFi6hiIGCS8DWoVPcOloHxZ9YJbAkFMqBNsQCTpnq/kZEnVpTsaW6gWoAEssQUlXUytVQWFltsPj8EJ0CFm99CHReQI7FmkJIZAORKlKJtKXwUXXlIKMrsDSph5HMX+KJPUkoCJuUGdrL0YqQsFJhIeFGRjcAkPHvppAcgcJpMWZqkfwE5L630UEGMVnslliipADiMlvDehMGLu9T/AIkotnSaE6RCY8SnFpXETFkS6iYpSV4xZr0IKkMXxupjzq43rmfwAi1YROgBqhoHcd8GhgJv4VCJFpNEEoChZ4AWZP8AHAQlgSgLx8XqkFBQWkE0Z8GB3CKEzS6ySiaJJkNCABcldtg2oyBCoRIR+/pRDRQ0F4HD3ReMMUJhQHIXndoA0oWAZLneaqsvDBgnm3+CsUNMrzOHmkGTDIXtLs37aSVbaQjZipq6ucjucgruT/VC3OU/yJmmenh1O1JCq6v38IZETg8IoFgxGd6AFhDkUWyUXk9f8PZMTRjDRDFsljvRMwXcrl73XsAJWAytMluLmCJmiLDkNTorhwtS5Rai1dUFLI0L7RTcak74Vey7p3FQZ4dxcNATkbYkbeq5XFbfMffZbnqw71L7QSTILA8D/EaHJtRZywqD40EQGDsAzu2WpROGDudx/XWSkSEbAOKAyErkpFhwShYkDBJ0IpfyoJG62xQTtq789yk0owEOOhREw41m581IbSMN8UYSgFX5TY6j73MQiVBLSZsj38IUCZHFzKcP0po+kAG44GBU73NHIRdg7xQVhSRAnL41pstRtCFtX9BCUi4TjPj4UpMRSpjOgcDTYmxi5kOgDZBLoO+jAKVBDGoR1VmiTEJNgoB9PvALgmpUwJIGaDmLKgnNeKLCwnIj4/QWmQOkklJAuF4ET7OiIUli3cbKlQtgYeWF/oQFhYNCWlUtA4wC1JDu1r4dHCjMSTkT7KO8o2A28Sj9/AYj3KbevYSoVB2hDo7REbg8npUGZmC6gnlqZnT7pianZQS/d6hCHBebUHhut6EVEVdBEwxonmog772S0H3cn2fjWLtQipM2qRbkXQtzzQgQnRHyPoF12CqAoWzPPR6YO7Qp6ukQRdJLGKe4bujdRga2zv2UHw6tESgN1gooFT8tgdsBQnh0TpoSTlUaFCXVRiFR8q33L0RQGMaAu2UIypKzxx4FIFOQgUMNVRl880q5fu9otM1M7FBAAne9o0BVIpMywP8Ag7NPi8Z6FuC2prxAF8g/lacGjBD/AGEGrzqgXDyKrQmKSD1hRKKsdw0pd0RgO6qJZkNIT5vqMjzA9QSJYJhHeqAcAyRfQMH+6CLFg+gweBYC6tAoLdYlK0mgMAAgAgDoIKiWJoZ6hiWWYPw71mlREitbVYgFujOca4q0aLOBoj9lCSci8lYxquUXFjZQaL1fegwy9EIiEA8wlRhhnG3ZKaMMeU0pfqRLA7ihphsOzkThsnScdIAgKbdAjj2FNYly0xSi0oQxLePoYhEikrYRtVhiKnoi6Ri8g5nXFjTYT4Dy6qQGWQubHYRmBMUGiLp1l5/oPKhv6dBvhHFcWTAn3UOcVBeAtx6goGMxSAPMKf2TKM+sKeaDgBRaZ5vOTTCoDAX5jmgWISO51niC1KWszQabLkn0OjVgUEPKgCCiygIhDvciici1JwnoUYYEgwnairLu4jM6LaZqhNyB3UITNRCCj9iD2oBOq4Wu2WpAdljcGDKiMsAZku6DCF9oPIJL3B2gXw13H0UgEsaot3vVvLdruvQVAFBfNHP3UCsBNWYOCodJ40Dl0jtSPfDDtHSgyI4ujBuyYoKABAGA6I9AZJW+IDSpESAVl5egA1zqzSQas+nQs70I5SbqtsE4zUCFwEkGNaRRCxMUDvKGxqh8v6p9dKlBkxdLHTzg2sSjPzHVAKsEXZiCkTETwe40KESUtwjQ0hYWYnWKASsFCKSWzxUuBkZJH9lXABSRW99FAFkF2Il6QReevYH2iTW+3RuIFhQG7bfyBlj7uITkVpoBBtZJKggMrAQT0KCxLtvRsAGwR2AisEueacEsBCx5AUyKU/Dj2plpiDN3KVxCJeEw700NExJEGTeoH8YogmJMlmrC+Ay0oaCP5QsoiDXv6eso3akleIpFzYRG+75vQkRASJhKRF8Z2ue4FE5yCw+QoHFFMSdlmaumALgRK7+goGxYDShmnDGaWa7hP/YoLS1sQNQVjz0MzkUL1lEbTEwanalWUjbjZwqHTpP+gyhyymeaUANMCCEmVDQLZQrFCM1Pio0Mn3Qvakv0WbNQEAcEUJEGFM7VCCGQt7OxAXbjpoLcbxvQTJipV0O1MygWM6qBQhaDyCakIsAkbLUIkbgKNEOtcaGxujjogCD5QJhQsYlwI2qHsAP66AKaJtnMZoDf/lLsR1sh5ChH3ysByhoWembZguoB3ERUR5CrBOHgoC7spQ0jDGUQgVGAu1AVfEFptWmkAnCc21T4FUI2rkUE651paA+FX0zjZigBVRQ2KGEWWWJNO/sowZaiSBMLaYsdIhkclp6kKZ1CE91+6AYhgY3q3114FA6pHOZGAoAW/g2mAe9PmxJC3B0/ioBKnJjqUWUonc4kH/oKJERBI7nQvODcHuAFaCWXuOabNlZt32ilqa8CgzRGxe5tebfw09wUw4llEqkzM0FwdDClDKEQJpQTqGY1h/28quiHHKICgvQCRkWLLzQZIV+gJQq2RJAi9aYTijbZFoAxsdBMaCM4JssjzA8gozJMCMMJHcKNCbCNqhvU3y3lTxzsmiRfLrm2d5juOhhTsXZLwqY2EgjdbVSMBAxCzacrnQeZxXL0r8Acipw2WWnE0UBZADu57CC2+KjWm7zPiv8AdQNkVy5qd7AAiXiqQWMFYWI0NBokRFzuBU3bBDsu00G8rcLjUBZekNvKDcUJ2IrMShrWqyEibJqLFRMZO8qYiC2BL18HyVcSEJwUE8jRv5ik6zI6vSKMgA4I6JjquTPApboRGrWoFOcnfsjVXMLALfs8oot2SeZfAcVqdEMYXwB4BU7juBzTQctp45A2pHU4CYLt3CmCeY7AN2KAWRckO74UtmRThCUTQKQALwlXlpSaOg3P6U5LLeOJmkYLyRlvHNHhSERdQM6l2aFTElhQcJ2oVxcoAotagpNg+bI7rKEyRLQmJ8agBW7TYW8z4NBrjTcBohyUTNgItpGHQErgkWOCg6ALm6VZK3csZ9VY+6IpFQyIwjUwWzKHd9qDsYbSmIf1JRIk1uUAoxlgvsHJQpDfgEhYoCenhS8dVQD3SceqN6l16NCqLNLXcIoA89fdI86iNYaAm1ikSPVl8j/YK4zfDQCq1uK7bJSCwSYBsVATGxoUArU5A8ApX9sjQuaArd2AFrHqVBM3B3DooxBfifF6orSHiTRPi4qTF5dUBAdd3j9FWh7+FtKLgwDn3yzSvZQT3S+ZqyTmsKANOiAmb7CiMxXU2jiWmQQmFrlqlEtcebQPlsLO6gfsNBCLgt4KT2WbNVC06BGaBGunED5ihJGAq5oGWMQamGjKrsaQRNCBQsMCyZNFEBrrCxfdAozktsNw8hQO0yblWKbV3LoBQqoh7mXgKD0HIqR/oURK5WfvEqhBbTu4pKZu5WgrcqsRfotIlhMcP8B1A2AMu66golJzBO9FAaOGe8qDbbQYibtWg1BNwRuRTLJPOlroDABFAW3axTIoNbQ0tzRBcqHUPNQhKRSrmY3KCEIO03vp10vC7inohSqwFHLaH2j9qwh7dAz4pLu29FjCZhE0Csdg7jPtUID9QO1pY3/sXRBSIIu1CJCm3oGCk8Bbd0F9BDe7MfqUBsxtjdZQS0IG08jcVpfYQ/2FbkML1rWk2vVmaiZY/B9EoILfJv2MRRs5ad2jsEFbB6UCPFpq/rhulIILQGQKJVy9C0ig4L+GQuYeKBoJEL8dhh5KT5MvShADwbn6D8fSvYfB3di8tvyDhLwe4fvsa/8AIAbwH7dgR37/ACAUz8XY+7R+n8gD2K4nyvs/X5AUlu56diHcB+QbvkvsV53P1/v8gRSzJ78vXsfBPi/4+0HNw2qAQB2AZmPHJgfJ+OwqPEywRQDiGufioLHIjN1fHqR0WEBCJIlWmYzWbUIUMw/jSIBSwBlpTU4/oBqdOrf20LLhRF8VWkeIoNUZVNuGIBVESN7NjLwUDUe+FC1zRVg0uYwz/wAq6jMM8N1RGg2IT8Z/0jwRQE5Gih9xRnggZGRtS99FsA7BRtkMcloCmcIqiHbtjT1h3OgtNG0BSUEjlZA2poaJ0BVkkfyIRCXDIjCf/DMVIzWKAvvRuPhxRirny39V8t/VfLf1Xy39V8t/VfLf1XwX9V8N/VTpQWv5ihUxLBkNgo3ixsc1fBf1Xw39V8N/VZ4cW3wvxJhVXeUFewu6rqv0lEKlpW+HFeqRmaBpFlGT+nmgjpAvSLYq144fiYZOld8dSL2NFLtnTp06dOp5wXQ7j7FbsuoF6AlnlYni9h06dXyvwWQ3thpJF6FXMpeZ+ESiJIiJo0khWgw9Crm0ubS5tLm0ubS5tLm0ubSAwkrm/UY7KcF9AIooqqoqub21VVVVVFzaXNpc2lzaXNpc2lzaXNpc2lzaXNpc2lzaXNpc2lzaXNpc2lzaXNpc2lzaXNpc2lzaXNpc2lzaXNpc2lzaXNpMI2FkvsJqpoBbuoQqer8ApHWKBjlIgeNGywfVYhz98ei9v7BlU7oFACAUAadie1NTU9ZqanrNTU1NTU1PYmpqampqansTU1NTU9ZqansTU1NTU1NTU1NT2Jr0Ht/YJiIPn2OhNR7wF3J4e6lP0in9gipaA9cIKoIDeY7Oz2GZm0MdIDiIDRfqHEQmq/QBkiUOjPUllFDXD7vbzIjMVhKld2HRQL2zzDMI6VS3B5VPGM3lfznrAcPdduXNOqShGyNB9DLgR+TqL6JRTXoyArAaPVRRsUz9MiMzAjIhyHd0QCFI7MuhSnb2v+fsoCNygHSc8kLtq9HZGGlO5URuCBNTq+Z37ainyePSKy6AZtxXLUONQ41BKI3hK/T4Lb0xe56AsAKtgOoJEbBglUA66nYGg2o2mJ26/nPSKEIglzAOeaKDUQhCdl4PMfScwiy2+B30ohfepeRR/wBhUZeuQrdog1oJsiyEJWLuOkvhZfYQX2kdYCCGyTQEIOWoqdtcfhxVkLmBbqESsv4f4fQZU+K36fL4/ShdUAtfadDK7qVEhAlLCXR0EBbSobUOxbV7A02KJNuG3/oppqJergPJ+DHZ89Y+gxgE2M1EAg3wVFLYACAqOxCg91zudKOnwW/7D6b3u0qMQhEkStRJt3B9L9KnxW/T5fH6UDq3g34j5GvUky9MpC3hKw4MmeRDt7QiPcWePco+woh1PHNPS0Uo9V6BSRZz2PPWPoMYEO8I7EPI86Ro7PwW/wCw7w22SFDPZRPZRPZQsaxkyNA6EaJHxv8AoeP0r0qfFb9Pl8fpQOrj5xN4NB28wOzz9HYLG9cw9Tigi3RpwFagFSRwBJ5o9dMKbgs9hZ6x22MF2DniiEEAADQ6FbAJVxFLVFjDnaCJVVcq05JeI1eh7RKgKgpAyJ1+C3/ZQshNjM1K5mPXo82P0fSvSp8Vv0+Xx7MF2mV1bct+8KODXDUzJ84HvSEDKgIKtT0cdLPpx7lCMsMBsdEDRytIhbQXe9RuStQeuTrnrHbYwGd07yP39AeQHlpkZeR1fBb/ALFgepjV6Y/Eu4AoMFjIu789WmSg9Xu+lelT4rfp8vj2YX3dr4NurfEzs/0dowGOMFQioo7y8fwD9uhzuXHUGfJeWD3+h56x22MHHcZ12dCM+Bo9lgMnQYnd0+C3/Yp6zgaNXJo/3HYBoAlXBWmd5aG76RelT4rfp8vj2ZTtYuHFAPSzJl5gqJM993YCIAVMAF2lmdcbduqBX9jH7efZP5oSqUKHdU4v9SlzYGpQqqCyCR2fPWO2xhMNpF4sUPTEocmR0SgJZbCUdkxO7p8Fv+xoBfI0GijwWcjlajWGaJsQ2uLw08avC2zJ67n6d6VPit+ny+PahefGlo6qJWmG3cUnoHS5o5aRC3birSIfEfodWIQWNVoFauG6DQojATjobIEdmToBUACXQKUQXdSEtYgt+ggKucFe/YHlIp9toOwHU9Y+gxhjMYlmpHRDpTd9ooQMQfv64u46fBb/ALJ3cRCGh7EmNKzdz9S9KnxW/T5fHtQlpPxUEzUK83P6dkHUIe414N2pKnVOOwG/LhNRR8QJpRy95ruhASk+x5acbCnh+qV5ZCdCoK1IA7nYesfQYwnY6aCQMd2O9fqhOj2MsXcdPgt/2oCnw3KhuTSn5N+lvwrtd6u9V/wr9FHx413igcc0S9hH0GzIwlYvCNvEoOmT0LvLNR3qO9fF6BkbcD3qdHnwf281Yv2C3ddsDZa3fX6dMBGT7P3Q/wCxaag2QR5rvdDnvnu6er1DcqO9My9kIwgeHQAX3cVKn9lZ7JLcmOqwX0rvUGT/ALvtRcXOUNPUyRaeakT0nZdygnqxYo2XMLI6HVVSFAvUiRcUJYe2sYzaDpiX1OGlkFV1X6KIRRGRNKiSCFW/QqRAgtctFvndTw9NbfMSerFix7lwdHQKRRhITriRPlLKR9XFiChYiEbn/vif/9k=" alt="Guardian Life Insurance"><span>Quiz Portal</span></div>'+
+      '<div class="login-sub">Sign in with the email and password your admin gave you.</div>';
+
+    if(state.loginError){
+      var err = document.createElement('div');
+      err.className = 'login-error';
+      err.textContent = state.loginError;
+      card.appendChild(err);
+    }
+
+    // Real <form> with autocomplete hints so the browser's own
+    // "Save password?" prompt can appear after a successful login.
+    var form = document.createElement('form');
+    form.setAttribute('autocomplete', 'on');
+
+    var emailRow = document.createElement('div');
+    emailRow.className = 'form-row';
+    emailRow.innerHTML = '<label>Email</label>';
+    var emailInput = document.createElement('input');
+    emailInput.type = 'email'; emailInput.name = 'email'; emailInput.autocomplete = 'username';
+    emailInput.placeholder = 'you@guardianlife.com'; emailInput.required = true;
+    emailRow.appendChild(emailInput);
+    form.appendChild(emailRow);
+
+    var pwRow = document.createElement('div');
+    pwRow.className = 'form-row';
+    pwRow.innerHTML = '<label>Password</label>';
+    var pwInput = document.createElement('input');
+    pwInput.type = 'password'; pwInput.name = 'password'; pwInput.autocomplete = 'current-password';
+    pwInput.placeholder = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'; pwInput.required = true;
+    pwRow.appendChild(pwInput);
+    form.appendChild(pwRow);
+
+    var loginBtn = document.createElement('button');
+    loginBtn.type = 'submit';
+    loginBtn.className = 'btn primary btn-full';
+    loginBtn.textContent = 'Log in';
+    form.appendChild(loginBtn);
+
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      var email = emailInput.value.trim().toLowerCase();
+      var pw = pwInput.value;
+      var u = state.data.users.find(function(x){ return x.email.toLowerCase() === email; });
+      if(!u || u.password !== pw){
+        state.loginError = 'Incorrect email or password.';
+        render();
+        return;
+      }
+      state.currentUserId = u.id;
+      state.loginError = '';
+      state.data.userLogins[u.id] = Date.now();
+      saveData();
+      sessionSet(SESSION_KEY, u.id);
+      state.tab = u.role === 'Admin' ? 'users' : (u.role === 'Team Leader' ? 'teamdash' : 'quiz');
+      render();
+      // Letting the form's own submit event fire (rather than only handling
+      // a button click) is what allows Chrome/Firefox/Edge to detect this as
+      // a real login and offer to save the credentials in the browser.
+    });
+
+    card.appendChild(form);
+
+    var note = document.createElement('div');
+    note.className = 'login-note';
+    note.textContent = 'Your browser may offer to save this password for faster sign-in next time. That\u2019s handled entirely by your browser \u2014 the admin never sees it. Forgot your password? Ask your admin to reset it.';
+    card.appendChild(note);
+
+    wrap.appendChild(card);
+    setTimeout(function(){ emailInput.focus(); }, 0);
+    return wrap;
+  }
+
+  /* ================= TOP BAR ================= */
+  function renderTopbar(){
+    var bar = document.createElement('div');
+    bar.className = 'topbar';
+    var brand = document.createElement('div');
+    brand.className = 'brand';
+    brand.innerHTML = '<span class="dot"></span>Quiz Portal';
+    bar.appendChild(brand);
+
+    var user = currentUser();
+
+    if(user.role === 'Admin'){
+      var pendingCount = state.data.disputes.filter(function(d){return d.status==='pending';}).length;
+      var adminDestinations = [
+        ['users','User Accounts'],['teams','Teams'],['quizmgmt','Quiz Management'],
+        ['disputes','Disputes', pendingCount],['knowledge','Knowledge Updates'],
+        ['reports','Reports'],['backup','Backup & Restore']
+      ];
+      var menuWrap = document.createElement('div');
+      menuWrap.className = 'admin-menu-wrap';
+      var menuBtn = document.createElement('button');
+      menuBtn.type = 'button'; menuBtn.className = 'admin-menu-btn'; menuBtn.innerHTML = '&#8942;';
+      menuBtn.title = 'Admin menu';
+      var panel = document.createElement('div');
+      panel.className = 'admin-menu-panel' + (state.adminMenuOpen ? ' open' : '');
+      adminDestinations.forEach(function(d){
+        var item = document.createElement('div');
+        item.className = 'admin-menu-item' + (state.tab===d[0] ? ' active' : '');
+        item.innerHTML = '<span>'+d[1]+'</span>' + (d[2] ? '<span class="admin-menu-badge">'+d[2]+'</span>' : '');
+        item.onclick = function(){
+          state.tab = d[0];
+          state.editingUserId=null; state.editingQuestionId=null; state.editingQuizId=null; state.editingKuId=null; state.kuMode='list';
+          state.adminMenuOpen = false;
+          render();
+        };
+        panel.appendChild(item);
+      });
+      menuBtn.onclick = function(e){
+        e.stopPropagation();
+        state.adminMenuOpen = !state.adminMenuOpen;
+        render();
+      };
+      menuWrap.appendChild(menuBtn);
+      menuWrap.appendChild(panel);
+      bar.appendChild(menuWrap);
+      if(state.adminMenuOpen){
+        setTimeout(function(){
+          document.addEventListener('click', function closeOnce(){
+            state.adminMenuOpen = false; render();
+            document.removeEventListener('click', closeOnce);
+          }, {once:true});
+        }, 0);
+      }
+    }
+
+    var initials = user.name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+    var userWrap = document.createElement('div');
+    userWrap.className = 'top-user';
+    var avatarHtml = user.photo ? '<img src="'+user.photo+'">' : initials;
+    userWrap.innerHTML =
+      '<div class="avatar">'+avatarHtml+'</div>'+
+      '<div>'+escapeHtml(user.name)+'<span class="role-pill">'+user.role+(user.team?' \u00b7 '+escapeHtml(user.team):'')+'</span></div>';
+    var logoutBtn = document.createElement('button');
+    logoutBtn.className = 'logout-btn';
+    logoutBtn.textContent = 'Log out';
+    logoutBtn.onclick = function(){
+      state.currentUserId = null;
+      sessionSet(SESSION_KEY, '');
+      render();
+    };
+    userWrap.appendChild(logoutBtn);
+    bar.appendChild(userWrap);
+    return bar;
+  }
+
+  /* ================= TAB BARS ================= */
+  function renderAdminTabs(){
+    var tabs = document.createElement('div');
+    tabs.className = 'tabs';
+    var pendingCount = state.data.disputes.filter(function(d){return d.status==='pending';}).length;
+    [['users','User Accounts'],['teams','Teams'],['quizmgmt','Quiz Management'],['disputes','Disputes'+(pendingCount?' ('+pendingCount+')':'')],['knowledge','Knowledge Updates'],['reports','Reports'],['backup','Backup & Restore']].forEach(function(t){
+      var btn = document.createElement('button');
+      btn.className = 'tab-btn' + (state.tab===t[0] ? ' active' : '');
+      btn.textContent = t[1];
+      btn.onclick = function(){ state.tab = t[0]; state.editingUserId=null; state.editingQuestionId=null; state.editingQuizId=null; state.editingKuId=null; state.kuMode='list'; render(); };
+      tabs.appendChild(btn);
+    });
+    return tabs;
+  }
+  function renderLeaderTabs(){
+    var tabs = document.createElement('div');
+    tabs.className = 'tabs';
+    [['teamdash','Team Dashboard'],['password','Change Password']].forEach(function(t){
+      var btn = document.createElement('button');
+      btn.className = 'tab-btn' + (state.tab===t[0] ? ' active' : '');
+      btn.textContent = t[1];
+      btn.onclick = function(){ state.tab = t[0]; state.changePwError=''; state.changePwSuccess=false; render(); };
+      tabs.appendChild(btn);
+    });
+    return tabs;
+  }
+  function renderUserTabs(){
+    var tabs = document.createElement('div');
+    tabs.className = 'tabs';
+    [['quiz','Take Quiz'],['history','My History'],['password','Change Password']].forEach(function(t){
+      var btn = document.createElement('button');
+      btn.className = 'tab-btn' + (state.tab===t[0] ? ' active' : '');
+      btn.textContent = t[1];
+      btn.onclick = function(){ state.tab = t[0]; state.changePwError=''; state.changePwSuccess=false; render(); };
+      tabs.appendChild(btn);
+    });
+    return tabs;
+  }
+
+  /* ================= USER MANAGEMENT (admin) ================= */
+  function renderUserManagement(){
+    var wrap = document.createElement('div');
+    var formCard = document.createElement('div');
+    formCard.className = 'card';
+    var editing = state.editingUserId ? state.data.users.find(function(u){return u.id===state.editingUserId;}) : null;
+    formCard.innerHTML = '<div class="section-title">'+(editing ? 'Edit account' : 'Create a new user account')+'</div>';
+
+    var nameInput = document.createElement('input'); nameInput.type='text'; nameInput.value = editing ? editing.name : '';
+    var emailInput = document.createElement('input'); emailInput.type='email'; emailInput.value = editing ? editing.email : '';
+    var pwInput = document.createElement('input'); pwInput.type='text';
+    pwInput.placeholder = editing ? 'Leave blank to keep current password' : 'Default password';
+    var roleSelect = document.createElement('select');
+    ROLES.forEach(function(r){
+      var op = document.createElement('option'); op.value=r; op.textContent=r;
+      if(editing && editing.role===r) op.selected = true;
+      roleSelect.appendChild(op);
+    });
+    var teamSelect = document.createElement('select');
+    var teamNoneOp = document.createElement('option'); teamNoneOp.value=''; teamNoneOp.textContent='No team';
+    teamSelect.appendChild(teamNoneOp);
+    state.data.teams.forEach(function(tm){
+      var op = document.createElement('option'); op.value=tm; op.textContent=tm;
+      if(editing && editing.team===tm) op.selected = true;
+      teamSelect.appendChild(op);
+    });
+
+    function row(labelText, el){
+      var r = document.createElement('div'); r.className = 'form-row';
+      var l = document.createElement('label'); l.textContent = labelText;
+      r.appendChild(l); r.appendChild(el);
+      return r;
+    }
+    var grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:14px;';
+    grid.appendChild(row('Full name', nameInput));
+    grid.appendChild(row('Email address', emailInput));
+    grid.appendChild(row(editing ? 'Reset password (optional)' : 'Default password', pwInput));
+    grid.appendChild(row('Role', roleSelect));
+    grid.appendChild(row('Team', teamSelect));
+
+    var photoState = { dataUrl: editing ? editing.photo : null };
+    var photoWrap = document.createElement('div');
+    photoWrap.innerHTML = '<label style="display:block;font-size:11px;color:var(--text-dim);margin-bottom:6px;">Profile photo (saved at 1080\u00d71080px)</label>';
+    var photoPreviewRow = document.createElement('div');
+    photoPreviewRow.style.cssText = 'display:flex;align-items:center;gap:10px;';
+    var photoPreview = document.createElement('img');
+    photoPreview.style.cssText = 'width:44px;height:44px;border-radius:10px;object-fit:cover;background:var(--surface-2);border:1px solid var(--line);';
+    photoPreview.src = photoState.dataUrl || '';
+    photoPreview.style.display = photoState.dataUrl ? 'block' : 'none';
+    var photoInput = document.createElement('input');
+    photoInput.type = 'file'; photoInput.accept = 'image/*';
+    photoInput.onchange = function(e){
+      var f = e.target.files[0];
+      if(!f) return;
+      resizeImageToSquare(f, 1080, function(dataUrl){
+        photoState.dataUrl = dataUrl;
+        photoPreview.src = dataUrl;
+        photoPreview.style.display = 'block';
+      });
+    };
+    photoPreviewRow.appendChild(photoPreview); photoPreviewRow.appendChild(photoInput);
+    photoWrap.appendChild(photoPreviewRow);
+    grid.appendChild(photoWrap);
+    formCard.appendChild(grid);
+
+    var saveBtn = document.createElement('button');
+    saveBtn.className = 'btn primary';
+    saveBtn.textContent = editing ? 'Save changes' : 'Create account';
+    saveBtn.onclick = function(){
+      var name = nameInput.value.trim();
+      var email = emailInput.value.trim().toLowerCase();
+      if(!name || !email){ alert('Name and email are required.'); return; }
+      if(roleSelect.value === 'Team Leader' && !teamSelect.value){ alert('A Team Leader must be assigned a team.'); return; }
+      var clash = state.data.users.find(function(u){ return u.email.toLowerCase()===email && (!editing || u.id!==editing.id); });
+      if(clash){ alert('This email is already assigned to another account.'); return; }
+      if(editing){
+        editing.name = name; editing.email = email; editing.role = roleSelect.value;
+        editing.team = teamSelect.value || null; editing.photo = photoState.dataUrl;
+        if(pwInput.value.trim()){ editing.password = pwInput.value.trim(); editing.mustChangePassword = true; }
+      }else{
+        if(!pwInput.value.trim()){ alert('Please set a default password.'); return; }
+        state.data.users.push({id:uid(), name:name, email:email, password:pwInput.value.trim(), role:roleSelect.value, team:teamSelect.value||null, mustChangePassword:true, photo:photoState.dataUrl});
+      }
+      state.editingUserId = null;
+      saveData(); render();
+    };
+    formCard.appendChild(saveBtn);
+    if(editing){
+      var cancelBtn = document.createElement('button');
+      cancelBtn.className = 'btn secondary'; cancelBtn.style.marginLeft = '8px'; cancelBtn.textContent = 'Cancel';
+      cancelBtn.onclick = function(){ state.editingUserId = null; render(); };
+      formCard.appendChild(cancelBtn);
+    }
+    wrap.appendChild(formCard);
+
+    var listCard = document.createElement('div');
+    listCard.className = 'card';
+    listCard.innerHTML = '<div class="section-title">All accounts</div>';
+    var table = document.createElement('table');
+    table.className = 'data-table';
+    table.innerHTML = '<tr><th>Photo</th><th>Name</th><th>Email</th><th>Role</th><th>Team</th><th>Status</th><th></th></tr>';
+    var roleBadgeClass = {Admin:'admin', User:'user', 'Team Leader':'leader', Management:'management'};
+    state.data.users.forEach(function(u){
+      var tr = document.createElement('tr');
+      var photoCell = u.photo ? '<img src="'+u.photo+'" style="width:30px;height:30px;border-radius:8px;object-fit:cover;">' : '<div style="width:30px;height:30px;border-radius:8px;background:var(--surface-2);"></div>';
+      tr.innerHTML = '<td>'+photoCell+'</td><td>'+escapeHtml(u.name)+'</td><td>'+escapeHtml(u.email)+'</td>'+
+        '<td><span class="role-badge '+roleBadgeClass[u.role]+'">'+u.role+'</span></td>'+
+        '<td>'+(u.team ? escapeHtml(u.team) : '<span style="color:var(--text-mute);">\u2014</span>')+'</td>'+
+        '<td>'+(u.mustChangePassword ? '<span style="font-size:11px;color:var(--text-mute);">Password not yet changed</span>' : '<span style="font-size:11px;color:var(--green);">Active</span>')+'</td>';
+      var tdActions = document.createElement('td');
+      tdActions.style.cssText = 'display:flex;gap:6px;';
+      var editBtn = document.createElement('button');
+      editBtn.className = 'btn secondary small'; editBtn.textContent = 'Edit';
+      editBtn.onclick = function(){ state.editingUserId = u.id; render(); };
+      tdActions.appendChild(editBtn);
+      if(u.id !== state.currentUserId){
+        var delBtn = document.createElement('button');
+        delBtn.className = 'btn danger small'; delBtn.textContent = 'Delete';
+        delBtn.onclick = function(){
+          if(!confirm('Remove ' + u.name + '\u2019s account? This cannot be undone.')) return;
+          state.data.users = state.data.users.filter(function(x){return x.id!==u.id;});
+          saveData(); render();
+        };
+        tdActions.appendChild(delBtn);
+      }
+      tr.appendChild(tdActions);
+      table.appendChild(tr);
+    });
+    listCard.appendChild(table);
+    wrap.appendChild(listCard);
+    return wrap;
+  }
+
+  /* ================= TEAM MANAGEMENT (admin) ================= */
+  function renderTeamManagement(){
+    var wrap = document.createElement('div');
+    var card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = '<div class="section-title">Teams</div>';
+    var table = document.createElement('table');
+    table.className = 'data-table';
+    table.innerHTML = '<tr><th>Team</th><th>Users</th><th>Questions</th><th>Quizzes</th><th></th></tr>';
+    state.data.teams.forEach(function(tm){
+      var userCount = state.data.users.filter(function(u){return u.team===tm;}).length;
+      var qCount = state.data.questionBank.filter(function(q){return q.team===tm;}).length;
+      var quizCount = state.data.quizzes.filter(function(q){return q.team===tm;}).length;
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>'+escapeHtml(tm)+'</td><td>'+userCount+'</td><td>'+qCount+'</td><td>'+quizCount+'</td>';
+      var tdA = document.createElement('td');
+      var delBtn = document.createElement('button');
+      delBtn.className = 'btn danger small'; delBtn.textContent = 'Delete';
+      delBtn.onclick = function(){
+        if(userCount || qCount || quizCount){ alert('This team still has users, questions, or quizzes assigned to it. Reassign them before deleting the team.'); return; }
+        state.data.teams = state.data.teams.filter(function(x){return x!==tm;});
+        saveData(); render();
+      };
+      tdA.appendChild(delBtn);
+      tr.appendChild(tdA);
+      table.appendChild(tr);
+    });
+    card.appendChild(table);
+
+    var addRow = document.createElement('div');
+    addRow.style.cssText = 'display:flex;gap:8px;margin-top:16px;';
+    var newTeamInput = document.createElement('input');
+    newTeamInput.type='text'; newTeamInput.placeholder='New team name';
+    newTeamInput.style.cssText = 'flex:1;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:13px;';
+    var addBtn = document.createElement('button');
+    addBtn.className = 'btn primary'; addBtn.textContent = 'Add team';
+    addBtn.onclick = function(){
+      var name = newTeamInput.value.trim();
+      if(!name) return;
+      if(state.data.teams.indexOf(name) !== -1){ alert('This team already exists.'); return; }
+      state.data.teams.push(name);
+      saveData(); render();
+    };
+    addRow.appendChild(newTeamInput); addRow.appendChild(addBtn);
+    card.appendChild(addRow);
+    wrap.appendChild(card);
+    return wrap;
+  }
+
+  /* ================= QUIZ MANAGEMENT (admin) ================= */
+  function renderQuizManagement(){
+    var wrap = document.createElement('div');
+    var subtabs = document.createElement('div');
+    subtabs.className = 'subtabs';
+    [['bank','Question Bank'],['quizzes','Quizzes']].forEach(function(t){
+      var b = document.createElement('button');
+      b.className = 'subtab-btn' + (state.quizMgmtSubtab===t[0] ? ' active' : '');
+      b.textContent = t[1];
+      b.onclick = function(){ state.quizMgmtSubtab = t[0]; state.editingQuestionId=null; state.editingQuizId=null; render(); };
+      subtabs.appendChild(b);
+    });
+    wrap.appendChild(subtabs);
+
+    if(state.quizMgmtSubtab === 'bank') wrap.appendChild(renderQuestionBankAdmin());
+    else wrap.appendChild(renderQuizzesAdmin());
+    return wrap;
+  }
+
+  function renderQuestionBankAdmin(){
+    var wrap = document.createElement('div');
+    var card = document.createElement('div');
+    card.className = 'card';
+    var editing = state.editingQuestionId ? state.data.questionBank.find(function(q){return q.id===state.editingQuestionId;}) : null;
+    card.innerHTML = '<div class="section-title">'+(editing ? 'Edit question' : 'Add a question to the bank')+'</div>';
+
+    var teamSel = document.createElement('select');
+    state.data.teams.forEach(function(tm){
+      var op = document.createElement('option'); op.value=tm; op.textContent=tm;
+      if(editing ? editing.team===tm : false) op.selected = true;
+      teamSel.appendChild(op);
+    });
+    var teamRow = document.createElement('div'); teamRow.className='form-row';
+    teamRow.innerHTML = '<label>Team</label>'; teamRow.appendChild(teamSel);
+    card.appendChild(teamRow);
+
+    var qInput = document.createElement('input');
+    qInput.type = 'text'; qInput.placeholder = 'Question text'; qInput.value = editing ? editing.question : '';
+    qInput.style.cssText = 'width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px;';
+    card.appendChild(qInput);
+
+    var optWrap = document.createElement('div');
+    optWrap.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;';
+    var optInputs = [];
+    for(var i=0;i<4;i++){
+      var oi = document.createElement('input');
+      oi.type = 'text'; oi.placeholder = 'Option ' + (i+1);
+      oi.value = editing ? editing.options[i] : '';
+      oi.style.cssText = 'background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:12px;';
+      optInputs.push(oi);
+      optWrap.appendChild(oi);
+    }
+    card.appendChild(optWrap);
+
+    var correctRow = document.createElement('div');
+    correctRow.style.cssText = 'margin-bottom:6px;display:flex;align-items:center;gap:8px;';
+    var correctLabel = document.createElement('label');
+    correctLabel.textContent = 'Correct option:'; correctLabel.style.cssText = 'font-size:12px;color:var(--text-dim);';
+    var correctSel = document.createElement('select');
+    correctSel.style.cssText = 'background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px;';
+    var placeholderOp = document.createElement('option');
+    placeholderOp.value = ''; placeholderOp.textContent = 'Select correct option';
+    placeholderOp.disabled = true;
+    placeholderOp.selected = !editing;
+    correctSel.appendChild(placeholderOp);
+    [0,1,2,3].forEach(function(i){
+      var op = document.createElement('option'); op.value=i; op.textContent='Option '+(i+1);
+      if(editing && editing.correctIndex === i) op.selected = true;
+      correctSel.appendChild(op);
+    });
+    correctRow.appendChild(correctLabel); correctRow.appendChild(correctSel);
+    card.appendChild(correctRow);
+    var correctNote = document.createElement('div');
+    correctNote.style.cssText = 'font-size:11px;color:var(--text-mute);margin-bottom:12px;';
+    correctNote.textContent = 'No option is selected by default \u2014 you must choose the correct answer yourself before this question can be saved.';
+    card.appendChild(correctNote);
+
+    var addQBtn = document.createElement('button');
+    addQBtn.className = 'btn primary';
+    addQBtn.textContent = editing ? 'Save changes' : 'Add to question bank';
+    addQBtn.onclick = function(){
+      var opts = optInputs.map(function(o){return o.value.trim();});
+      if(!qInput.value.trim() || opts.some(function(o){return !o;})){ alert('Fill in the question and all four options.'); return; }
+      if(correctSel.value === ''){ alert('You must select the correct answer before this question can be saved to the bank.'); return; }
+      var correctIdx = parseInt(correctSel.value,10);
+      if(editing){
+        editing.team = teamSel.value; editing.question = qInput.value.trim();
+        editing.options = opts; editing.correctIndex = correctIdx; editing.acceptedIndexes = [correctIdx];
+      }else{
+        state.data.questionBank.push({id:uid(), team:teamSel.value, question:qInput.value.trim(), options:opts, correctIndex:correctIdx, acceptedIndexes:[correctIdx]});
+      }
+      state.editingQuestionId = null;
+      saveData(); render();
+    };
+    card.appendChild(addQBtn);
+    if(editing){
+      var cancelQBtn = document.createElement('button');
+      cancelQBtn.className = 'btn secondary'; cancelQBtn.style.marginLeft = '8px'; cancelQBtn.textContent = 'Cancel';
+      cancelQBtn.onclick = function(){ state.editingQuestionId = null; render(); };
+      card.appendChild(cancelQBtn);
+    }
+    wrap.appendChild(card);
+
+    var listCard = document.createElement('div');
+    listCard.className = 'card';
+    listCard.innerHTML = '<div class="section-title">All questions ('+state.data.questionBank.length+')</div>';
+    var usedIds = {};
+    state.data.teams.forEach(function(tm){ (state.data.teamUsedQuestionIds[tm]||[]).forEach(function(id){ usedIds[id]=true; }); });
+    var table = document.createElement('table');
+    table.className = 'data-table';
+    table.innerHTML = '<tr><th>Team</th><th>Question</th><th>Correct answer</th><th>Status</th><th></th></tr>';
+    state.data.questionBank.forEach(function(q){
+      var tr = document.createElement('tr');
+      var usedBadge = usedIds[q.id] ? '<span style="font-size:11px;color:var(--text-mute);">Used in a quiz</span>' : '<span style="font-size:11px;color:var(--green);">Available</span>';
+      tr.innerHTML = '<td>'+escapeHtml(q.team)+'</td><td>'+escapeHtml(q.question)+'</td><td>'+escapeHtml(q.options[q.correctIndex])+'</td><td>'+usedBadge+'</td>';
+      var tdA = document.createElement('td');
+      tdA.style.cssText = 'display:flex;gap:6px;';
+      var editBtn = document.createElement('button');
+      editBtn.className = 'btn secondary small'; editBtn.textContent = 'Edit';
+      editBtn.onclick = function(){ state.editingQuestionId = q.id; render(); };
+      var delBtn = document.createElement('button');
+      delBtn.className = 'btn danger small'; delBtn.textContent = 'Delete';
+      delBtn.onclick = function(){
+        state.data.questionBank = state.data.questionBank.filter(function(x){return x.id!==q.id;});
+        Object.keys(state.data.teamUsedQuestionIds).forEach(function(tm){
+          state.data.teamUsedQuestionIds[tm] = (state.data.teamUsedQuestionIds[tm]||[]).filter(function(id){return id!==q.id;});
+        });
+        saveData(); render();
+      };
+      tdA.appendChild(editBtn); tdA.appendChild(delBtn);
+      tr.appendChild(tdA);
+      table.appendChild(tr);
+    });
+    listCard.appendChild(table);
+    wrap.appendChild(listCard);
+    return wrap;
+  }
+
+  function renderQuizzesAdmin(){
+    var wrap = document.createElement('div');
+    var card = document.createElement('div');
+    card.className = 'card';
+    var editing = state.editingQuizId ? state.data.quizzes.find(function(q){return q.id===state.editingQuizId;}) : null;
+    card.innerHTML = '<div class="section-title">'+(editing ? 'Edit quiz' : 'Create a new quiz')+'</div>';
+
+    var titleInput = document.createElement('input');
+    titleInput.type='text'; titleInput.placeholder = 'e.g. Daily Quiz for Inbound'; titleInput.value = editing ? editing.title : '';
+    var teamSel = document.createElement('select');
+    state.data.teams.forEach(function(tm){
+      var op = document.createElement('option'); op.value=tm; op.textContent=tm;
+      if(editing ? editing.team===tm : false) op.selected = true;
+      teamSel.appendChild(op);
+    });
+    var dateInput = document.createElement('input'); dateInput.type='date'; dateInput.value = editing ? editing.scheduledDate : new Date().toISOString().slice(0,10);
+    var timeInput = document.createElement('input'); timeInput.type='time'; timeInput.value = editing ? editing.scheduledTime : '09:00';
+    var durInput = document.createElement('input'); durInput.type='number'; durInput.min='1'; durInput.value = editing ? editing.durationMinutes : 30;
+    var countInput = document.createElement('input'); countInput.type='number'; countInput.min='1'; countInput.value = editing ? editing.questionIds.length : 5;
+
+    function row(labelText, el){
+      var r = document.createElement('div'); r.className = 'form-row';
+      var l = document.createElement('label'); l.textContent = labelText;
+      r.appendChild(l); r.appendChild(el);
+      return r;
+    }
+    var grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:14px;';
+    grid.appendChild(row('Quiz title', titleInput));
+    grid.appendChild(row('Team', teamSel));
+    grid.appendChild(row('Run date', dateInput));
+    grid.appendChild(row('Run time', timeInput));
+    grid.appendChild(row('Duration (minutes, once started)', durInput));
+    card.appendChild(grid);
+
+    var manualListHolder = document.createElement('div');
+
+    if(!editing){
+      var modeRow = document.createElement('div');
+      modeRow.style.cssText = 'display:flex;gap:16px;align-items:center;margin-bottom:14px;';
+      var autoRadio = document.createElement('input'); autoRadio.type='radio'; autoRadio.name='qSelMode'; autoRadio.id='qSelAuto'; autoRadio.checked = true;
+      var autoLbl = document.createElement('label'); autoLbl.htmlFor='qSelAuto'; autoLbl.style.fontSize='13px'; autoLbl.textContent = 'Auto-select questions';
+      var manualRadio = document.createElement('input'); manualRadio.type='radio'; manualRadio.name='qSelMode'; manualRadio.id='qSelManual';
+      var manualLbl = document.createElement('label'); manualLbl.htmlFor='qSelManual'; manualLbl.style.fontSize='13px'; manualLbl.textContent = 'Manually choose questions';
+      modeRow.appendChild(autoRadio); modeRow.appendChild(autoLbl); modeRow.appendChild(manualRadio); modeRow.appendChild(manualLbl);
+      card.appendChild(modeRow);
+
+      var countRow = row('Number of questions to auto-select', countInput);
+      card.appendChild(countRow);
+
+      var availNote = document.createElement('div');
+      availNote.style.cssText = 'font-size:11px;color:var(--text-mute);margin-bottom:12px;';
+      function currentAvail(){
+        var used = state.data.teamUsedQuestionIds[teamSel.value] || [];
+        return state.data.questionBank.filter(function(q){ return q.team===teamSel.value && used.indexOf(q.id)===-1; });
+      }
+      function updateAvailNote(){
+        availNote.textContent = currentAvail().length + ' unused question(s) available for ' + teamSel.value + '. Questions already used in an earlier quiz for this team won\u2019t be shown again.';
+      }
+      card.appendChild(availNote);
+      card.appendChild(manualListHolder);
+
+      function renderManualList(){
+        manualListHolder.innerHTML = '';
+        var avail = currentAvail();
+        if(avail.length === 0){
+          var none = document.createElement('div');
+          none.className = 'empty-note';
+          none.textContent = 'No unused questions available for this team.';
+          manualListHolder.appendChild(none);
+          return;
+        }
+        avail.forEach(function(q){
+          var optRow = document.createElement('label');
+          optRow.style.cssText = 'display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer;';
+          var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = q.id; cb.className = 'qManualCheck';
+          optRow.appendChild(cb);
+          var span = document.createElement('span'); span.textContent = q.question;
+          optRow.appendChild(span);
+          manualListHolder.appendChild(optRow);
+        });
+      }
+
+      function refreshMode(){
+        var isManual = manualRadio.checked;
+        countRow.style.display = isManual ? 'none' : '';
+        manualListHolder.style.display = isManual ? '' : 'none';
+        if(isManual) renderManualList();
+      }
+      autoRadio.onchange = refreshMode;
+      manualRadio.onchange = refreshMode;
+      teamSel.addEventListener('change', function(){ updateAvailNote(); if(manualRadio.checked) renderManualList(); });
+      updateAvailNote();
+      refreshMode();
+    }
+
+    var saveBtn = document.createElement('button');
+    saveBtn.className = 'btn primary';
+    saveBtn.textContent = editing ? 'Save changes' : 'Create quiz';
+    saveBtn.onclick = function(){
+      if(!titleInput.value.trim()){ alert('Give the quiz a title.'); return; }
+      if(editing){
+        editing.title = titleInput.value.trim();
+        editing.team = teamSel.value;
+        editing.scheduledDate = dateInput.value;
+        editing.scheduledTime = timeInput.value;
+        editing.durationMinutes = parseInt(durInput.value,10) || 30;
+        saveData(); state.editingQuizId = null; render();
+        return;
+      }
+      var used = state.data.teamUsedQuestionIds[teamSel.value] || [];
+      var avail = state.data.questionBank.filter(function(q){ return q.team===teamSel.value && used.indexOf(q.id)===-1; });
+      if(avail.length === 0){ alert('There are no unused questions left in the bank for this team. Add more questions first.'); return; }
+
+      var isManualMode = document.getElementById('qSelManual').checked;
+      var selectedIds;
+      if(isManualMode){
+        selectedIds = Array.prototype.slice.call(document.querySelectorAll('.qManualCheck:checked')).map(function(cb){return cb.value;});
+        if(selectedIds.length === 0){ alert('Select at least one question, or switch to Auto-select.'); return; }
+      }else{
+        var n = Math.min(parseInt(countInput.value,10)||1, avail.length);
+        selectedIds = shuffleArr(avail).slice(0, n).map(function(q){return q.id;});
+      }
+      var quiz = {
+        id: uid(), title: titleInput.value.trim(), team: teamSel.value,
+        scheduledDate: dateInput.value, scheduledTime: timeInput.value,
+        durationMinutes: parseInt(durInput.value,10) || 30, enabled: true,
+        questionIds: selectedIds, createdAt: Date.now()
+      };
+      state.data.quizzes.push(quiz);
+      if(!state.data.teamUsedQuestionIds[teamSel.value]) state.data.teamUsedQuestionIds[teamSel.value] = [];
+      state.data.teamUsedQuestionIds[teamSel.value] = state.data.teamUsedQuestionIds[teamSel.value].concat(quiz.questionIds);
+      saveData(); render();
+    };
+    card.appendChild(saveBtn);
+    if(editing){
+      var cancelBtn = document.createElement('button');
+      cancelBtn.className = 'btn secondary'; cancelBtn.style.marginLeft='8px'; cancelBtn.textContent='Cancel';
+      cancelBtn.onclick = function(){ state.editingQuizId = null; render(); };
+      card.appendChild(cancelBtn);
+    }
+    wrap.appendChild(card);
+
+    var listCard = document.createElement('div');
+    listCard.className = 'card';
+    listCard.innerHTML = '<div class="section-title">All quizzes ('+state.data.quizzes.length+')</div>';
+    if(state.data.quizzes.length === 0){
+      listCard.innerHTML += '<div class="empty-note">No quizzes created yet.</div>';
+    }else{
+      var table = document.createElement('table');
+      table.className = 'data-table';
+      table.innerHTML = '<tr><th>Title</th><th>Team</th><th>Run at</th><th>Questions</th><th>Status</th><th></th></tr>';
+      state.data.quizzes.slice().sort(function(a,b){return b.createdAt-a.createdAt;}).forEach(function(quiz){
+        var st = quizStatus(quiz);
+        var badge = st==='running' ? '<span class="status-badge running">Running</span>' : st==='scheduled' ? '<span class="status-badge scheduled">Scheduled</span>' : '<span class="status-badge off">Disabled</span>';
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td>'+escapeHtml(quiz.title)+'</td><td>'+escapeHtml(quiz.team)+'</td><td>'+fmtDate(quiz.scheduledDate)+' '+quiz.scheduledTime+'</td><td>'+quiz.questionIds.length+'</td><td>'+badge+'</td>';
+        var tdA = document.createElement('td');
+        tdA.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
+        var editBtn = document.createElement('button');
+        editBtn.className = 'btn secondary small'; editBtn.textContent = 'Edit';
+        editBtn.onclick = function(){ state.editingQuizId = quiz.id; render(); };
+        var toggleBtn = document.createElement('button');
+        toggleBtn.className = 'btn secondary small'; toggleBtn.textContent = quiz.enabled ? 'Disable' : 'Enable';
+        toggleBtn.onclick = function(){ quiz.enabled = !quiz.enabled; saveData(); render(); };
+        var delBtn = document.createElement('button');
+        delBtn.className = 'btn danger small'; delBtn.textContent = 'Delete';
+        delBtn.onclick = function(){
+          if(!confirm('Delete "'+quiz.title+'"? Its questions will become available for future quizzes again.')) return;
+          state.data.quizzes = state.data.quizzes.filter(function(x){return x.id!==quiz.id;});
+          if(state.data.teamUsedQuestionIds[quiz.team]){
+            state.data.teamUsedQuestionIds[quiz.team] = state.data.teamUsedQuestionIds[quiz.team].filter(function(id){ return quiz.questionIds.indexOf(id)===-1; });
+          }
+          saveData(); render();
+        };
+        tdA.appendChild(editBtn); tdA.appendChild(toggleBtn); tdA.appendChild(delBtn);
+        tr.appendChild(tdA);
+        table.appendChild(tr);
+      });
+      listCard.appendChild(table);
+    }
+    wrap.appendChild(listCard);
+    return wrap;
+  }
+
+  /* ================= DISPUTE MANAGEMENT (admin) ================= */
+  /* ================= BACKUP & RESTORE (admin) ================= */
+  /* ================= KNOWLEDGE UPDATES ================= */
+  function buildMiniRichTextEditor(initialHtml, editorId){
+    var wrap = document.createElement('div');
+    var toolbar = document.createElement('div');
+    toolbar.className = 'rte-mini-toolbar';
+
+    var editorBox = document.createElement('div');
+    editorBox.id = editorId;
+    editorBox.className = 'rte-mini-editor';
+    editorBox.contentEditable = 'true';
+    editorBox.setAttribute('data-placeholder', 'Write the update content here...');
+    editorBox.innerHTML = initialHtml || '';
+
+    function cmdBtn(label, cmd, val, title){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'rte-mini-btn'; b.innerHTML = label;
+      if(title) b.title = title;
+      b.onmousedown = function(e){ e.preventDefault(); };
+      b.onclick = function(){ document.execCommand(cmd, false, val||null); editorBox.focus(); };
+      return b;
+    }
+    toolbar.appendChild(cmdBtn('<b>B</b>','bold',null,'Bold'));
+    toolbar.appendChild(cmdBtn('<i>I</i>','italic',null,'Italic'));
+    toolbar.appendChild(cmdBtn('<u>U</u>','underline',null,'Underline'));
+    toolbar.appendChild(cmdBtn('&#8226; List','insertUnorderedList',null,'Bulleted list'));
+    toolbar.appendChild(cmdBtn('1. List','insertOrderedList',null,'Numbered list'));
+    var linkBtn = cmdBtn('&#128279;','createLink',null,'Insert link (opens in a new tab)');
+    linkBtn.onclick = function(){
+      var url = prompt('Link URL:');
+      if(url){
+        document.execCommand('createLink', false, url);
+        editorBox.querySelectorAll('a').forEach(function(a){ a.setAttribute('target','_blank'); a.setAttribute('rel','noopener noreferrer'); });
+      }
+      editorBox.focus();
+    };
+    toolbar.appendChild(linkBtn);
+    toolbar.appendChild(cmdBtn('Clear','removeFormat',null,'Clear formatting'));
+
+    wrap.appendChild(toolbar);
+    wrap.appendChild(editorBox);
+    return wrap;
+  }
+
+  function renderKnowledgeUpdatesAdmin(){
+    if(state.kuMode === 'create' || state.kuMode === 'edit') return renderKnowledgeUpdateForm();
+    return renderKnowledgeUpdatesList();
+  }
+
+  function renderKnowledgeUpdatesList(){
+    var wrap = document.createElement('div');
+
+    var searchCard = document.createElement('div');
+    searchCard.className = 'card';
+    var searchRow = document.createElement('div');
+    searchRow.className = 'ku-toolbar-row';
+    var searchBox = document.createElement('div');
+    searchBox.className = 'form-row ku-search-box';
+    searchBox.innerHTML = '<label>Name</label>';
+    var searchInput = document.createElement('input');
+    searchInput.type = 'text'; searchInput.placeholder = 'Search by name';
+    searchInput.value = state.kuSearchName;
+    searchBox.appendChild(searchInput);
+    searchRow.appendChild(searchBox);
+
+    var btnGroup = document.createElement('div');
+    btnGroup.style.cssText = 'display:flex;gap:8px;';
+    var resetBtn = document.createElement('button');
+    resetBtn.className = 'btn secondary small'; resetBtn.textContent = 'Reset';
+    resetBtn.onclick = function(){ state.kuSearchName=''; render(); };
+    var searchBtn = document.createElement('button');
+    searchBtn.className = 'btn primary small'; searchBtn.textContent = 'Search';
+    searchBtn.onclick = function(){ state.kuSearchName = searchInput.value; render(); };
+    btnGroup.appendChild(resetBtn); btnGroup.appendChild(searchBtn);
+    searchRow.appendChild(btnGroup);
+    searchCard.appendChild(searchRow);
+    wrap.appendChild(searchCard);
+
+    var listCard = document.createElement('div');
+    listCard.className = 'card';
+    var listHead = document.createElement('div');
+    listHead.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;';
+    listHead.innerHTML = '<div class="section-title" style="margin:0;">Knowledge List</div>';
+    var newBtn = document.createElement('button');
+    newBtn.className = 'btn primary small'; newBtn.textContent = '+ New';
+    newBtn.onclick = function(){ state.editingKuId = null; state.kuMode = 'create'; render(); };
+    listHead.appendChild(newBtn);
+    listCard.appendChild(listHead);
+
+    var items = state.data.knowledgeUpdates.slice();
+    if(state.kuSearchName.trim()){
+      var q = state.kuSearchName.trim().toLowerCase();
+      items = items.filter(function(k){ return k.name.toLowerCase().indexOf(q) !== -1; });
+    }
+    items.sort(function(a,b){ return b.createdAt - a.createdAt; });
+
+    if(items.length === 0){
+      var emptyNote = document.createElement('div');
+      emptyNote.className = 'empty-note';
+      emptyNote.textContent = 'No knowledge updates found.';
+      listCard.appendChild(emptyNote);
+    }else{
+      var table = document.createElement('table');
+      table.className = 'data-table';
+      table.innerHTML = '<tr><th>#</th><th>Name</th><th>Status</th><th>Created By</th><th>Created Date</th><th>Action</th></tr>';
+      items.forEach(function(k, idx){
+        var tr = document.createElement('tr');
+        var statusHtml = k.status === 1
+          ? '<span class="status-dot on"></span>Active'
+          : '<span class="status-dot off"></span>Inactive';
+        tr.innerHTML = '<td>'+(idx+1)+'</td><td>'+escapeHtml(k.name)+'</td><td>'+statusHtml+'</td><td>'+escapeHtml(k.createdBy)+'</td><td>'+fmtDate(k.createdAt)+'</td>';
+        var tdA = document.createElement('td');
+        var viewBtn = document.createElement('button');
+        viewBtn.className = 'icon-btn view'; viewBtn.title = 'View'; viewBtn.innerHTML = '&#128065;';
+        viewBtn.onclick = function(){ state.viewingKuId = k.id; render(); };
+        var editBtn = document.createElement('button');
+        editBtn.className = 'icon-btn edit'; editBtn.title = 'Edit'; editBtn.innerHTML = '&#9998;';
+        editBtn.onclick = function(){ state.editingKuId = k.id; state.kuMode = 'edit'; render(); };
+        var delBtn = document.createElement('button');
+        delBtn.className = 'icon-btn delete'; delBtn.title = 'Delete'; delBtn.innerHTML = '&#10005;';
+        delBtn.onclick = function(){
+          if(!confirm('Delete "'+k.name+'"?')) return;
+          state.data.knowledgeUpdates = state.data.knowledgeUpdates.filter(function(x){return x.id!==k.id;});
+          saveData(); render();
+        };
+        tdA.appendChild(viewBtn); tdA.appendChild(editBtn); tdA.appendChild(delBtn);
+        tr.appendChild(tdA);
+        table.appendChild(tr);
+      });
+      listCard.appendChild(table);
+    }
+    wrap.appendChild(listCard);
+    return wrap;
+  }
+
+  function renderKnowledgeUpdateForm(){
+    var editing = state.editingKuId ? state.data.knowledgeUpdates.find(function(k){return k.id===state.editingKuId;}) : null;
+    var wrap = document.createElement('div');
+    var card = document.createElement('div');
+    card.className = 'card';
+
+    var headRow = document.createElement('div');
+    headRow.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;';
+    var titleEl = document.createElement('div');
+    titleEl.style.cssText = 'font-size:16px;font-weight:700;';
+    titleEl.textContent = editing ? 'Edit Knowledge Update' : 'Create Knowledge Update';
+    var backBtn = document.createElement('button');
+    backBtn.className = 'btn secondary small'; backBtn.textContent = '\u2190 Back';
+    backBtn.onclick = function(){ state.kuMode = 'list'; state.editingKuId = null; render(); };
+    headRow.appendChild(backBtn);
+    headRow.appendChild(titleEl);
+
+    var addContentBtn = document.createElement('button');
+    addContentBtn.className = 'btn primary small';
+    addContentBtn.textContent = '+ Add Content';
+    headRow.appendChild(addContentBtn);
+    card.appendChild(headRow);
+
+    var grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:6px;';
+    var nameRow = document.createElement('div'); nameRow.className = 'form-row';
+    nameRow.innerHTML = '<label>Name *</label>';
+    var nameInput = document.createElement('input'); nameInput.type = 'text'; nameInput.placeholder = 'Name';
+    nameInput.value = editing ? editing.name : '';
+    nameRow.appendChild(nameInput);
+    grid.appendChild(nameRow);
+
+    var dtRow = document.createElement('div'); dtRow.className = 'form-row';
+    dtRow.innerHTML = '<label>Start Date and time *</label>';
+    var dtInput = document.createElement('input'); dtInput.type = 'datetime-local';
+    dtInput.value = editing ? editing.startDateTime : '';
+    dtRow.appendChild(dtInput);
+    grid.appendChild(dtRow);
+    card.appendChild(grid);
+
+    var statusRow = document.createElement('div');
+    statusRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:20px;';
+    var statusCheck = document.createElement('input');
+    statusCheck.type = 'checkbox'; statusCheck.id = 'kuStatusCheck';
+    statusCheck.checked = editing ? editing.status === 1 : true;
+    var statusLabel = document.createElement('label');
+    statusLabel.htmlFor = 'kuStatusCheck'; statusLabel.style.fontSize = '13px';
+    statusLabel.textContent = 'Active (visible on user dashboards once its start date/time arrives)';
+    statusRow.appendChild(statusCheck); statusRow.appendChild(statusLabel);
+    card.appendChild(statusRow);
+
+    // --- content blocks: at least one, admin can add more via "+ Add Content" ---
+    var blocksHolder = document.createElement('div');
+    card.appendChild(blocksHolder);
+
+    var blockCounter = 0;
+    var blockIds = [];
+
+    function addContentBlock(initialHtml){
+      var blockKey = 'kuContentBlock-' + (blockCounter++);
+      blockIds.push(blockKey);
+
+      var blockWrap = document.createElement('div');
+      blockWrap.style.cssText = 'position:relative;border:1px solid var(--line);border-radius:8px;padding:14px 44px 14px 14px;margin-bottom:14px;background:var(--surface-2);';
+      var blockLabel = document.createElement('div');
+      blockLabel.style.cssText = 'font-size:13px;font-weight:600;margin-bottom:8px;';
+      blockLabel.textContent = 'Content';
+      blockWrap.appendChild(blockLabel);
+
+      var editorWrap = buildMiniRichTextEditor(initialHtml || '', blockKey);
+      blockWrap.appendChild(editorWrap);
+
+      var delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'icon-btn delete';
+      delBtn.style.cssText = 'position:absolute;top:12px;right:12px;';
+      delBtn.title = 'Remove this content block';
+      delBtn.innerHTML = '&#128465;';
+      delBtn.onclick = function(){
+        if(blocksHolder.children.length <= 1){ alert('A knowledge update needs at least one content block.'); return; }
+        blocksHolder.removeChild(blockWrap);
+        blockIds = blockIds.filter(function(k){ return k !== blockKey; });
+      };
+      blockWrap.appendChild(delBtn);
+
+      blocksHolder.appendChild(blockWrap);
+    }
+
+    if(editing && editing.contents && editing.contents.length){
+      editing.contents.forEach(function(c){ addContentBlock(c.html); });
+    }else{
+      addContentBlock('');
+    }
+
+    addContentBtn.onclick = function(){ addContentBlock(''); };
+
+    var btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;justify-content:space-between;margin-top:18px;';
+    var cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn secondary'; cancelBtn.textContent = 'Cancel';
+    cancelBtn.onclick = function(){ state.kuMode = 'list'; state.editingKuId = null; render(); };
+    var submitBtn = document.createElement('button');
+    submitBtn.className = 'btn primary'; submitBtn.textContent = 'Submit';
+    submitBtn.onclick = function(){
+      var name = nameInput.value.trim();
+      if(!name){ alert('Name is required.'); return; }
+      if(!dtInput.value){ alert('Start date and time is required.'); return; }
+      var contents = blockIds.map(function(key){
+        var el = document.getElementById(key);
+        return { id: uid(), html: el ? el.innerHTML.trim() : '' };
+      }).filter(function(c){ return c.html; });
+      if(contents.length === 0){ alert('Add at least some content before submitting.'); return; }
+      var user = currentUser();
+      if(editing){
+        editing.name = name;
+        editing.startDateTime = dtInput.value;
+        editing.status = statusCheck.checked ? 1 : 0;
+        editing.contents = contents;
+        editing.updatedAt = Date.now();
+      }else{
+        state.data.knowledgeUpdates.push({
+          id: uid(), name: name, startDateTime: dtInput.value, status: statusCheck.checked ? 1 : 0,
+          contents: contents, createdBy: user.name, createdByUserId: user.id, createdAt: Date.now(), updatedAt: Date.now()
+        });
+      }
+      saveData();
+      state.kuMode = 'list'; state.editingKuId = null;
+      render();
+    };
+    btnRow.appendChild(cancelBtn); btnRow.appendChild(submitBtn);
+    card.appendChild(btnRow);
+
+    wrap.appendChild(card);
+    return wrap;
+  }
+
+  function knowledgeUpdateContentsHtml(k){
+    if(k.contents && k.contents.length){
+      return k.contents.map(function(c, i){
+        return '<div class="ku-content-view"'+(i>0?' style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line);"':'')+'>'+c.html+'</div>';
+      }).join('');
+    }
+    // legacy single-content records from before multi-content support existed
+    return '<div class="ku-content-view">'+(k.content||'')+'</div>';
+  }
+
+  function renderMandatoryKnowledgeGate(){
+    var seen = state.data.userSeenKnowledgeUpdates[state.currentUserId] || [];
+    var unseen = liveKnowledgeUpdates().filter(function(k){ return seen.indexOf(k.id) === -1; });
+    if(state.kuGateIndex >= unseen.length) state.kuGateIndex = 0;
+    var k = unseen[state.kuGateIndex];
+
+    var wrap = document.createElement('div');
+    var card = document.createElement('div');
+    card.className = 'card';
+
+    var progress = document.createElement('div');
+    progress.style.cssText = 'font-size:11px;color:var(--text-mute);margin-bottom:10px;';
+    progress.textContent = 'Knowledge update ' + (state.kuGateIndex+1) + ' of ' + unseen.length + ' \u2014 please read before continuing to your dashboard';
+    card.appendChild(progress);
+
+    var head = document.createElement('div');
+    head.innerHTML = '<div style="font-size:18px;font-weight:700;margin-bottom:4px;">'+escapeHtml(k.name)+'</div>'+
+      '<div style="font-size:11px;color:var(--text-dim);margin-bottom:16px;">'+fmtDateTime(k.startDateTime)+'</div>';
+    card.appendChild(head);
+
+    var contentHolder = document.createElement('div');
+    contentHolder.innerHTML = knowledgeUpdateContentsHtml(k);
+    card.appendChild(contentHolder);
+
+    var isLast = state.kuGateIndex === unseen.length - 1;
+    var nextBtn = document.createElement('button');
+    nextBtn.className = 'btn primary';
+    nextBtn.style.marginTop = '18px';
+    nextBtn.textContent = isLast ? 'I\u2019ve read this \u2014 continue to dashboard' : 'I\u2019ve read this \u2014 next update';
+    nextBtn.onclick = function(){
+      if(!state.data.userSeenKnowledgeUpdates[state.currentUserId]) state.data.userSeenKnowledgeUpdates[state.currentUserId] = [];
+      state.data.userSeenKnowledgeUpdates[state.currentUserId].push(k.id);
+      saveData();
+      state.kuGateIndex = 0;
+      render();
+    };
+    card.appendChild(nextBtn);
+
+    wrap.appendChild(card);
+    return wrap;
+  }
+
+  function renderKnowledgeUpdatesCard(){
+    var card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = '<div class="section-title">Daily Updates</div>';
+    var live = liveKnowledgeUpdates();
+    if(live.length === 0){
+      card.innerHTML += '<div class="empty-note">No updates posted yet.</div>';
+      return card;
+    }
+    live.forEach(function(k){
+      var row = document.createElement('div');
+      row.className = 'quiz-list-row';
+      row.style.cursor = 'pointer';
+      row.innerHTML = '<div><div class="quiz-list-title">'+escapeHtml(k.name)+'</div><div class="quiz-list-meta">'+fmtDateTime(k.startDateTime)+'</div></div>';
+      row.onclick = function(){ state.viewingKuId = k.id; render(); };
+      card.appendChild(row);
+    });
+    return card;
+  }
+
+  function renderKnowledgeUpdateViewModal(){
+    var k = state.data.knowledgeUpdates.find(function(x){return x.id===state.viewingKuId;});
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    var box = document.createElement('div');
+    box.className = 'modal-box';
+    if(!k){
+      box.innerHTML = '<div class="empty-note">This update no longer exists.</div>';
+      overlay.appendChild(box);
+      return overlay;
+    }
+    var head = document.createElement('div');
+    head.className = 'modal-head';
+    head.innerHTML = '<div><div class="modal-title">'+escapeHtml(k.name)+'</div><div style="font-size:11px;color:var(--text-dim);margin-top:4px;">'+fmtDateTime(k.startDateTime)+' &middot; by '+escapeHtml(k.createdBy)+'</div></div>';
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'modal-close'; closeBtn.textContent = '\u2715';
+    closeBtn.onclick = function(){ state.viewingKuId = null; render(); };
+    head.appendChild(closeBtn);
+    box.appendChild(head);
+    var content = document.createElement('div');
+    content.innerHTML = knowledgeUpdateContentsHtml(k);
+    box.appendChild(content);
+    overlay.appendChild(box);
+    return overlay;
+  }
+
+  function renderBackupRestore(){
+    var wrap = document.createElement('div');
+
+    var whyCard = document.createElement('div');
+    whyCard.className = 'card';
+    whyCard.innerHTML =
+      '<div class="section-title">Why this matters</div>'+
+      '<div style="font-size:13px;line-height:1.7;color:var(--text-dim);">'+
+      'This portal saves everything (accounts, questions, quizzes, results) automatically to a Google Sheet in your Google Drive \u2014 there\u2019s nothing to remember to back up, '+
+      'and it works the same whether you\u2019re logged in normally, on a different device, or in an Incognito window. '+
+      'A downloadable .json snapshot is still useful as an extra offline copy, or if you ever want to move this data somewhere else.'+
+      '</div>';
+    wrap.appendChild(whyCard);
+
+    var backupCard = document.createElement('div');
+    backupCard.className = 'card';
+    backupCard.innerHTML = '<div class="section-title">Download a snapshot</div><div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Saves every account, question, quiz, and result as a single file on your computer.</div>';
+    var downloadBtn = document.createElement('button');
+    downloadBtn.className = 'btn primary';
+    downloadBtn.textContent = 'Download snapshot (.json)';
+    downloadBtn.onclick = function(){
+      var json = JSON.stringify(state.data, null, 2);
+      var blob = new Blob([json], {type:'application/json'});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      var stamp = new Date().toISOString().slice(0,10);
+      a.href = url; a.download = 'quiz-portal-backup-' + stamp + '.json';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    };
+    backupCard.appendChild(downloadBtn);
+    wrap.appendChild(backupCard);
+
+    var restoreCard = document.createElement('div');
+    restoreCard.className = 'card';
+    restoreCard.innerHTML = '<div class="section-title">Restore from a snapshot</div><div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">This replaces everything currently in the Google Sheet with the contents of the snapshot file. Anything created since that snapshot will be lost.</div>';
+    var fileInput = document.createElement('input');
+    fileInput.type = 'file'; fileInput.accept = '.json,application/json';
+    fileInput.style.marginBottom = '10px';
+    restoreCard.appendChild(fileInput);
+    var restoreBtn = document.createElement('button');
+    restoreBtn.className = 'btn danger';
+    restoreBtn.textContent = 'Restore this snapshot';
+    restoreBtn.onclick = function(){
+      var f = fileInput.files[0];
+      if(!f){ alert('Choose a snapshot file first.'); return; }
+      if(!confirm('This will replace all current data in the Google Sheet with the snapshot file. Continue?')) return;
+      var reader = new FileReader();
+      reader.onload = async function(){
+        try{
+          var parsed = JSON.parse(reader.result);
+          if(!parsed.users || !parsed.questionBank){ alert('This doesn\u2019t look like a valid Quiz Portal snapshot file.'); return; }
+          state.data = normalizeData(parsed);
+          state.lastSyncedData = null; // force every collection to be treated as changed
+          await saveData();
+          alert('Snapshot restored to the Google Sheet. The page will now reload.');
+          location.reload();
+        }catch(e){
+          alert('Could not read this file. Make sure it\u2019s a Quiz Portal snapshot (.json) file.');
+        }
+      };
+      reader.readAsText(f);
+    };
+    restoreCard.appendChild(restoreBtn);
+    wrap.appendChild(restoreCard);
+
+    return wrap;
+  }
+
+  /* ================= DISPUTE MANAGEMENT (admin) ================= */
+  function renderDisputeManagement(){
+    var wrap = document.createElement('div');
+    var pending = state.data.disputes.filter(function(d){return d.status==='pending';});
+    var resolved = state.data.disputes.filter(function(d){return d.status!=='pending';}).sort(function(a,b){return b.resolvedAt-a.resolvedAt;});
+
+    var pendingCard = document.createElement('div');
+    pendingCard.className = 'card';
+    pendingCard.innerHTML = '<div class="section-title">Pending disputes ('+pending.length+')</div>';
+    if(pending.length === 0){
+      pendingCard.innerHTML += '<div class="empty-note">No disputes waiting for review.</div>';
+    }else{
+      pending.forEach(function(d){
+        var block = document.createElement('div');
+        block.style.cssText = 'border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:12px;';
+        block.innerHTML =
+          '<div style="font-size:13px;font-weight:600;margin-bottom:4px;">'+escapeHtml(d.questionText)+'</div>'+
+          '<div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">Raised by <b>'+escapeHtml(d.userName)+'</b> ('+escapeHtml(d.team||'\u2014')+') on '+fmtDateTime(d.createdAt)+'</div>'+
+          '<div style="font-size:12px;margin-bottom:4px;">CSO\u2019s answer: <b>'+escapeHtml(d.selectedOption)+'</b> &middot; Originally marked correct: <b>'+escapeHtml(d.originalCorrectOption)+'</b></div>'+
+          (d.note ? '<div style="font-size:12px;color:var(--text-dim);font-style:italic;margin-bottom:8px;">\u201c'+escapeHtml(d.note)+'\u201d</div>' : '');
+
+        var noteInput = document.createElement('textarea');
+        noteInput.placeholder = 'Admin note (optional, shown in the resolved log)';
+        noteInput.style.cssText = 'width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;margin:8px 0;min-height:50px;';
+        block.appendChild(noteInput);
+
+        var btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
+
+        function resolveDispute(resolution){
+          d.status = 'resolved'; d.resolution = resolution; d.adminNote = noteInput.value.trim(); d.resolvedAt = Date.now();
+          var q = state.data.questionBank.find(function(x){return x.id===d.questionId;});
+          if(q && (resolution === 'disputed_correct' || resolution === 'both_correct')){
+            if(q.acceptedIndexes.indexOf(d.selectedIndex) === -1) q.acceptedIndexes.push(d.selectedIndex);
+            var remarkText = resolution === 'both_correct' ? 'Both answers are accepted as correct for this question.' : 'Your answer was accepted as correct after a dispute review.';
+            recomputeScoresForQuestion(d.questionId, remarkText);
+          }
+          saveData(); render();
+        }
+        var btnDisputed = document.createElement('button');
+        btnDisputed.className = 'btn primary small'; btnDisputed.textContent = 'Disputed answer is correct';
+        btnDisputed.onclick = function(){ resolveDispute('disputed_correct'); };
+        var btnOriginal = document.createElement('button');
+        btnOriginal.className = 'btn secondary small'; btnOriginal.textContent = 'Original answer confirmed correct';
+        btnOriginal.onclick = function(){ resolveDispute('original_correct'); };
+        var btnBoth = document.createElement('button');
+        btnBoth.className = 'btn secondary small'; btnBoth.textContent = 'Both answers accepted';
+        btnBoth.onclick = function(){ resolveDispute('both_correct'); };
+        btnRow.appendChild(btnDisputed); btnRow.appendChild(btnOriginal); btnRow.appendChild(btnBoth);
+        block.appendChild(btnRow);
+        pendingCard.appendChild(block);
+      });
+    }
+    wrap.appendChild(pendingCard);
+
+    var resolvedCard = document.createElement('div');
+    resolvedCard.className = 'card';
+    resolvedCard.innerHTML = '<div class="section-title">Resolved disputes ('+resolved.length+')</div>';
+    if(resolved.length === 0){
+      resolvedCard.innerHTML += '<div class="empty-note">No disputes resolved yet.</div>';
+    }else{
+      var resTable = document.createElement('table');
+      resTable.className = 'data-table';
+      resTable.innerHTML = '<tr><th>Question</th><th>Raised by</th><th>Outcome</th><th>Resolved</th></tr>';
+      var resolutionLabels = {disputed_correct:'Disputed answer accepted', original_correct:'Original answer confirmed', both_correct:'Both answers accepted'};
+      resolved.forEach(function(d){
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td>'+escapeHtml(d.questionText)+'</td><td>'+escapeHtml(d.userName)+'</td><td>'+(resolutionLabels[d.resolution]||d.resolution)+'</td><td>'+fmtDateTime(d.resolvedAt)+'</td>';
+        resTable.appendChild(tr);
+      });
+      resolvedCard.appendChild(resTable);
+    }
+    wrap.appendChild(resolvedCard);
+    return wrap;
+  }
+
+  /* ================= REPORTS (Admin / Management / Team Leader) ================= */
+  function renderReports(teamFilter){
+    var wrap = document.createElement('div');
+    var isScopedToTeam = !!teamFilter;
+
+    var titleCard = document.createElement('div');
+    titleCard.innerHTML = '<h2 style="font-size:16px;margin:0 0 14px;">'+(isScopedToTeam ? escapeHtml(teamFilter)+' \u2014 Team Dashboard' : 'Reports & Results Monitoring')+'</h2>';
+    wrap.appendChild(titleCard);
+    wrap.appendChild(renderKnowledgeUpdatesCard());
+
+    var effectiveTeam = isScopedToTeam ? teamFilter : state.reportsTeamFilter;
+
+    var filterCard = document.createElement('div');
+    filterCard.className = 'card';
+    filterCard.innerHTML = '<div class="section-title">Filters</div>';
+    var filterRow = document.createElement('div');
+    filterRow.className = 'filter-row';
+
+    if(!isScopedToTeam){
+      var teamFilterEl = document.createElement('div'); teamFilterEl.className = 'form-row';
+      teamFilterEl.innerHTML = '<label>Team</label>';
+      var teamSel = document.createElement('select');
+      var teamAllOp = document.createElement('option'); teamAllOp.value=''; teamAllOp.textContent='All teams';
+      teamSel.appendChild(teamAllOp);
+      state.data.teams.forEach(function(tm){
+        var op = document.createElement('option'); op.value=tm; op.textContent=tm;
+        if(state.reportsTeamFilter===tm) op.selected = true;
+        teamSel.appendChild(op);
+      });
+      teamSel.onchange = function(){ state.reportsTeamFilter = teamSel.value; state.reportsUserFilter=''; render(); };
+      teamFilterEl.appendChild(teamSel);
+      filterRow.appendChild(teamFilterEl);
+    }
+
+    var userFilterEl = document.createElement('div'); userFilterEl.className = 'form-row';
+    userFilterEl.innerHTML = '<label>User</label>';
+    var userSel = document.createElement('select');
+    var userAllOp = document.createElement('option'); userAllOp.value=''; userAllOp.textContent='All users';
+    userSel.appendChild(userAllOp);
+    state.data.users.filter(function(u){ return u.role==='User' && (!effectiveTeam || u.team===effectiveTeam); }).forEach(function(u){
+      var op = document.createElement('option'); op.value=u.id; op.textContent=u.name;
+      if(state.reportsUserFilter===u.id) op.selected = true;
+      userSel.appendChild(op);
+    });
+    userSel.onchange = function(){ state.reportsUserFilter = userSel.value; render(); };
+    userFilterEl.appendChild(userSel);
+    filterRow.appendChild(userFilterEl);
+
+    var startDateEl = document.createElement('div'); startDateEl.className = 'form-row';
+    startDateEl.innerHTML = '<label>From date</label>';
+    var startDateInput = document.createElement('input'); startDateInput.type = 'date'; startDateInput.value = state.reportsStartDate;
+    startDateInput.onchange = function(){ state.reportsStartDate = startDateInput.value; render(); };
+    startDateEl.appendChild(startDateInput);
+    filterRow.appendChild(startDateEl);
+
+    var endDateEl = document.createElement('div'); endDateEl.className = 'form-row';
+    endDateEl.innerHTML = '<label>To date</label>';
+    var endDateInput = document.createElement('input'); endDateInput.type = 'date'; endDateInput.value = state.reportsEndDate;
+    endDateInput.onchange = function(){ state.reportsEndDate = endDateInput.value; render(); };
+    endDateEl.appendChild(endDateInput);
+    filterRow.appendChild(endDateEl);
+
+    var resetFiltersBtn = document.createElement('button');
+    resetFiltersBtn.className = 'btn secondary small';
+    resetFiltersBtn.textContent = 'Reset filters';
+    resetFiltersBtn.onclick = function(){
+      if(!isScopedToTeam) state.reportsTeamFilter = '';
+      state.reportsUserFilter = ''; state.reportsStartDate = ''; state.reportsEndDate = '';
+      render();
+    };
+    filterRow.appendChild(resetFiltersBtn);
+    filterCard.appendChild(filterRow);
+    wrap.appendChild(filterCard);
+
+    var attempts = state.data.quizAttempts.filter(function(a){
+      if(effectiveTeam && a.team !== effectiveTeam) return false;
+      if(state.reportsUserFilter && a.userId !== state.reportsUserFilter) return false;
+      if(state.reportsStartDate && a.quizDate < state.reportsStartDate) return false;
+      if(state.reportsEndDate && a.quizDate > state.reportsEndDate) return false;
+      return true;
+    });
+
+    // --- icon stat cards ---
+    var stats = document.createElement('div');
+    stats.className = 'stat-grid';
+    var totalAttempts = attempts.length;
+    var totalQuizzes = state.data.quizzes.filter(function(q){ return !isScopedToTeam || q.team===teamFilter; }).length;
+    var avgPct = totalAttempts ? Math.round(attempts.reduce(function(s,a){return s+(a.score/a.total);},0)/totalAttempts*100) : 0;
+    var pendingDisputes = state.data.disputes.filter(function(d){ return d.status==='pending' && (!isScopedToTeam || d.team===teamFilter); }).length;
+    [
+      ['\ud83e\uddfe', totalQuizzes, 'Quizzes created'],
+      ['\ud83d\udcdd', totalAttempts, 'Attempts submitted'],
+      ['\ud83c\udfaf', avgPct+'%', 'Average score'],
+      ['\u26a0\ufe0f', pendingDisputes, 'Pending disputes']
+    ].forEach(function(s){
+      var c = document.createElement('div'); c.className = 'stat-card';
+      c.innerHTML = '<div class="stat-icon">'+s[0]+'</div><div class="stat-num">'+s[1]+'</div><div class="stat-lbl">'+s[2]+'</div>';
+      stats.appendChild(c);
+    });
+    wrap.appendChild(stats);
+
+    // --- charts ---
+    var chartCard = document.createElement('div');
+    chartCard.className = 'card';
+    chartCard.innerHTML = '<div class="section-title">At a glance</div>';
+    var chartRow = document.createElement('div');
+    chartRow.className = 'chart-row';
+
+    var correctTotal = 0, incorrectTotal = 0;
+    attempts.forEach(function(a){ (a.answers||[]).forEach(function(ans){ if(ans.isCorrect) correctTotal++; else incorrectTotal++; }); });
+    var donutBox = document.createElement('div');
+    donutBox.className = 'chart-box';
+    donutBox.innerHTML = '<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">Correct vs incorrect answers</div>'+
+      buildDonutSVG([{label:'Correct', value:correctTotal, color:'var(--green)'},{label:'Incorrect', value:incorrectTotal, color:'var(--red)'}]);
+    chartRow.appendChild(donutBox);
+
+    var barBox = document.createElement('div');
+    barBox.className = 'chart-box';
+    var barLabel, barData;
+    if(isScopedToTeam){
+      barLabel = 'Average score by team member';
+      var byUser = {};
+      attempts.forEach(function(a){
+        if(!byUser[a.userId]) byUser[a.userId] = {score:0,total:0,name:a.userName};
+        byUser[a.userId].score += a.score; byUser[a.userId].total += a.total;
+      });
+      barData = Object.keys(byUser).map(function(uidKey){
+        var u = byUser[uidKey];
+        return {label:u.name, value: u.total ? Math.round(u.score/u.total*100) : 0};
+      }).sort(function(a,b){return b.value-a.value;}).slice(0,8);
+    }else{
+      barLabel = 'Average score by team';
+      barData = state.data.teams.map(function(tm){
+        var teamAttempts = state.data.quizAttempts.filter(function(a){return a.team===tm;});
+        var s = teamAttempts.reduce(function(acc,a){return acc+a.score;},0);
+        var t = teamAttempts.reduce(function(acc,a){return acc+a.total;},0);
+        return {label:tm, value: t ? Math.round(s/t*100) : 0};
+      });
+    }
+    barBox.innerHTML = '<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">'+barLabel+'</div>'+buildBarList(barData);
+    chartRow.appendChild(barBox);
+    chartCard.appendChild(chartRow);
+    wrap.appendChild(chartCard);
+
+    // --- leaderboard ---
+    wrap.appendChild(renderLeaderboardCard(5, teamFilter));
+
+    // --- results table ---
+    var card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = '<div class="section-title">All results</div>';
+    if(attempts.length === 0){
+      card.innerHTML += '<div class="empty-note">No quiz attempts yet.</div>';
+    }else{
+      var downloadAllBtn = document.createElement('button');
+      downloadAllBtn.className = 'btn secondary small';
+      downloadAllBtn.textContent = 'Download all results (CSV)';
+      downloadAllBtn.style.marginBottom = '12px';
+      downloadAllBtn.onclick = function(){
+        var rows = attempts.map(function(a){ return [a.userName, a.userEmail, a.team, a.quizTitle, fmtDate(a.quizDate), a.score, a.total, fmtDateTime(a.finishedAt)]; });
+        downloadCSV('quiz-results.csv', ['User','Email','Team','Quiz','Quiz date','Score','Total','Completed at'], rows);
+      };
+      card.appendChild(downloadAllBtn);
+
+      var table = document.createElement('table');
+      table.className = 'data-table';
+      table.innerHTML = '<tr><th>User</th><th>Team</th><th>Quiz</th><th>Score</th><th>Date</th><th></th></tr>';
+      attempts.slice().sort(function(a,b){return b.finishedAt-a.finishedAt;}).forEach(function(a){
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td>'+escapeHtml(a.userName)+'</td><td>'+escapeHtml(a.team||'\u2014')+'</td><td>'+escapeHtml(a.quizTitle)+'</td><td>'+a.score+' / '+a.total+'</td><td>'+fmtDate(a.quizDate)+'</td>';
+        var tdA = document.createElement('td');
+        tdA.style.cssText = 'display:flex;gap:6px;';
+        var viewBtn = document.createElement('button');
+        viewBtn.className = 'btn secondary small'; viewBtn.textContent = 'View answers';
+        viewBtn.onclick = function(){ state.viewingAttemptId = a.id; render(); };
+        var markBtn = document.createElement('button');
+        markBtn.className = 'btn secondary small'; markBtn.textContent = 'Marking CSV';
+        markBtn.onclick = function(){
+          var rows = (a.answers||[]).map(function(ans){ return [a.userName, a.quizTitle, a.score+' / '+a.total, ans.questionText, ans.selectedOption, ans.correctOption, ans.isCorrect?'Correct':'Incorrect']; });
+          downloadCSV('marking-'+a.userName.replace(/\s+/g,'-').toLowerCase()+'-'+a.quizDate+'.csv', ['User','Quiz','Score','Question','Selected answer','Correct answer','Result'], rows);
+        };
+        tdA.appendChild(viewBtn); tdA.appendChild(markBtn);
+        tr.appendChild(tdA);
+        table.appendChild(tr);
+      });
+      card.appendChild(table);
+    }
+    wrap.appendChild(card);
+    return wrap;
+  }
+
+  function renderAttemptDetailModal(){
+    var a = state.data.quizAttempts.find(function(x){return x.id===state.viewingAttemptId;});
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    var box = document.createElement('div');
+    box.className = 'modal-box wide';
+    if(!a){
+      box.innerHTML = '<div class="empty-note">This result no longer exists.</div>';
+      overlay.appendChild(box);
+      return overlay;
+    }
+    var head = document.createElement('div');
+    head.className = 'modal-head';
+    head.innerHTML = '<div><div class="modal-title">'+escapeHtml(a.quizTitle)+'</div><div style="font-size:12px;color:var(--text-dim);margin-top:4px;">'+escapeHtml(a.userName)+' &middot; '+escapeHtml(a.team||'\u2014')+' &middot; '+fmtDateTime(a.finishedAt)+' &middot; Score: '+a.score+' / '+a.total+'</div></div>';
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'modal-close'; closeBtn.textContent = '\u2715';
+    closeBtn.onclick = function(){ state.viewingAttemptId = null; render(); };
+    head.appendChild(closeBtn);
+    box.appendChild(head);
+
+    (a.answers||[]).forEach(function(ans){
+      var block = document.createElement('div');
+      block.className = 'review-block';
+      block.innerHTML = '<div class="review-q">'+escapeHtml(ans.questionText)+'</div>'+
+        '<div class="review-a">Answer: <b style="color:'+(ans.isCorrect?'var(--green)':'var(--red)')+';">'+escapeHtml(ans.selectedOption)+'</b>'+(ans.isCorrect?'':' &middot; Correct: '+escapeHtml(ans.correctOption))+'</div>'+
+        (ans.remark ? '<div class="review-remark">\u2713 '+escapeHtml(ans.remark)+'</div>' : '');
+      box.appendChild(block);
+    });
+    overlay.appendChild(box);
+    return overlay;
+  }
+
+  function renderLeaderboardCard(limit, teamFilter){
+    var card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = '<div class="section-title">Top Performer Leaderboard'+(teamFilter?' \u2014 '+escapeHtml(teamFilter):'')+'</div>';
+    var rows = leaderboardData(teamFilter);
+    if(rows.length === 0){
+      card.innerHTML += '<div class="empty-note">No quiz results yet.</div>';
+      return card;
+    }
+    var top3 = rows.slice(0, 3);
+    if(top3.length > 0){
+      var podium = document.createElement('div');
+      podium.className = 'podium';
+      var order = [1, 0, 2].filter(function(i){ return top3[i]; });
+      order.forEach(function(i){
+        var r = top3[i]; var rank = i + 1;
+        var slot = document.createElement('div');
+        slot.className = 'podium-slot rank' + rank;
+        var photoWrap = document.createElement('div');
+        photoWrap.className = 'podium-photo-wrap';
+        if(r.user.photo){
+          var img = document.createElement('img'); img.className = 'podium-photo'; img.src = r.user.photo;
+          photoWrap.appendChild(img);
+        }else{
+          var ph = document.createElement('div'); ph.className = 'podium-photo-placeholder'; ph.textContent = r.user.name.charAt(0).toUpperCase();
+          photoWrap.appendChild(ph);
+        }
+        var badge = document.createElement('div'); badge.className = 'podium-rank-badge'; badge.textContent = '#' + rank;
+        photoWrap.appendChild(badge);
+        slot.appendChild(photoWrap);
+        slot.innerHTML += '<div class="podium-name">'+escapeHtml(r.user.name)+'</div><div class="podium-team">'+escapeHtml(r.user.team||'\u2014')+'</div><div class="podium-score">'+r.score+' / '+r.total+' ('+r.pct+'%)</div>';
+        podium.appendChild(slot);
+      });
+      card.appendChild(podium);
+    }
+    var tableRows = limit ? rows.slice(0, limit) : rows;
+    var table = document.createElement('table');
+    table.className = 'data-table';
+    table.innerHTML = '<tr><th>Rank</th><th>Photo</th><th>Name</th><th>Team</th><th>Score</th></tr>';
+    tableRows.forEach(function(r, idx){
+      var tr = document.createElement('tr');
+      var photoCell = r.user.photo ? '<img src="'+r.user.photo+'" style="width:32px;height:32px;border-radius:8px;object-fit:cover;">' : '<div style="width:32px;height:32px;border-radius:8px;background:var(--surface-2);"></div>';
+      tr.innerHTML = '<td style="font-weight:700;">#'+(idx+1)+'</td><td>'+photoCell+'</td><td>'+escapeHtml(r.user.name)+'</td><td>'+escapeHtml(r.user.team||'\u2014')+'</td><td>'+r.score+' / '+r.total+' ('+r.pct+'%)</td>';
+      table.appendChild(tr);
+    });
+    card.appendChild(table);
+    return card;
+  }
+
+  /* ================= USER: QUIZ HOME ================= */
+  function renderUserQuizHome(){
+    var wrap = document.createElement('div');
+    var user = currentUser();
+    wrap.appendChild(renderKnowledgeUpdatesCard());
+    if(!user.team){
+      var noTeamCard = document.createElement('div');
+      noTeamCard.className = 'card empty-note';
+      noTeamCard.textContent = 'You are not assigned to a team yet. Ask your admin to assign one before you can take a quiz.';
+      wrap.appendChild(noTeamCard);
+      return wrap;
+    }
+    wrap.appendChild(renderLeaderboardCard(5, user.team));
+
+    var card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = '<div class="section-title">Available quizzes for '+escapeHtml(user.team)+'</div>';
+
+    var completed = state.data.userCompletedQuizzes[state.currentUserId] || [];
+    var available = state.data.quizzes.filter(function(q){ return q.team === user.team && quizStatus(q) !== 'off'; });
+    if(available.length === 0){
+      card.innerHTML += '<div class="empty-note">No quizzes have been scheduled for your team yet.</div>';
+    }else{
+      available.slice().sort(function(a,b){ return (a.scheduledDate+a.scheduledTime) < (b.scheduledDate+b.scheduledTime) ? 1 : -1; }).forEach(function(quiz){
+        var row = document.createElement('div');
+        row.className = 'quiz-list-row';
+        var st = quizStatus(quiz);
+        var alreadyDone = completed.indexOf(quiz.id) !== -1;
+        var info = document.createElement('div');
+        info.innerHTML = '<div class="quiz-list-title">'+escapeHtml(quiz.title)+'</div>'+
+          '<div class="quiz-list-meta">'+quiz.questionIds.length+' question(s) &middot; '+quiz.durationMinutes+' min &middot; '+fmtDate(quiz.scheduledDate)+' at '+quiz.scheduledTime+'</div>';
+        row.appendChild(info);
+        var actionBtn = document.createElement('button');
+        if(alreadyDone){
+          actionBtn.className = 'btn secondary small'; actionBtn.textContent = 'Completed'; actionBtn.disabled = true;
+        }else if(st === 'scheduled'){
+          actionBtn.className = 'btn secondary small'; actionBtn.textContent = 'Scheduled'; actionBtn.disabled = true;
+        }else{
+          actionBtn.className = 'btn primary small'; actionBtn.textContent = 'Start quiz';
+          actionBtn.onclick = function(){ openQuiz(quiz); };
+        }
+        row.appendChild(actionBtn);
+        card.appendChild(row);
+      });
+    }
+    wrap.appendChild(card);
+    return wrap;
+  }
+
+  /* ================= USER: HISTORY ================= */
+  function renderAnswerReviewBlock(attempt, ans, idx, keyPrefix){
+    var block = document.createElement('div');
+    block.className = 'review-block';
+    block.innerHTML = '<div class="review-q">'+escapeHtml(ans.questionText)+'</div>'+
+      '<div class="review-a">Your answer: <b style="color:'+(ans.isCorrect?'var(--green)':'var(--red)')+';">'+escapeHtml(ans.selectedOption)+'</b>'+(ans.isCorrect?'':' &middot; Correct: '+escapeHtml(ans.correctOption))+'</div>'+
+      (ans.remark ? '<div class="review-remark">\u2713 '+escapeHtml(ans.remark)+'</div>' : '');
+
+    if(!ans.isCorrect){
+      var disputeKey = keyPrefix + '-' + idx;
+      if(state.disputingAnswerIndex === disputeKey){
+        var noteInput = document.createElement('textarea');
+        noteInput.placeholder = 'Why do you think your answer should be correct? (optional)';
+        noteInput.style.cssText = 'width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;margin-top:8px;min-height:60px;';
+        block.appendChild(noteInput);
+        var submitBtn = document.createElement('button');
+        submitBtn.className = 'btn primary small'; submitBtn.style.marginTop = '8px'; submitBtn.textContent = 'Submit dispute';
+        submitBtn.onclick = function(){
+          var user = currentUser();
+          state.data.disputes.push({
+            id: uid(), attemptId: attempt.id, userId: state.currentUserId, userName: user.name, team: user.team,
+            questionId: ans.questionId, questionText: ans.questionText,
+            selectedIndex: ans.selectedIndex, selectedOption: ans.selectedOption,
+            originalCorrectIndex: ans.correctIndex, originalCorrectOption: ans.correctOption,
+            options: ans.options, note: noteInput.value.trim(),
+            status: 'pending', resolution: null, adminNote: '', createdAt: Date.now(), resolvedAt: null
+          });
+          saveData(); state.disputingAnswerIndex = null; render();
+        };
+        block.appendChild(submitBtn);
+        var cancelDBtn = document.createElement('button');
+        cancelDBtn.className = 'btn secondary small'; cancelDBtn.style.marginTop = '8px'; cancelDBtn.style.marginLeft = '6px'; cancelDBtn.textContent = 'Cancel';
+        cancelDBtn.onclick = function(){ state.disputingAnswerIndex = null; render(); };
+        block.appendChild(cancelDBtn);
+      }else{
+        var existingDispute = state.data.disputes.find(function(d){ return d.attemptId === attempt.id && d.questionId === ans.questionId; });
+        var disputeBtn = document.createElement('button');
+        disputeBtn.className = 'btn secondary small'; disputeBtn.style.marginTop = '8px';
+        if(existingDispute){
+          disputeBtn.textContent = existingDispute.status === 'pending' ? 'Dispute submitted \u2014 pending review' : 'Dispute reviewed';
+          disputeBtn.disabled = true;
+        }else{
+          disputeBtn.textContent = 'Raise a dispute';
+          disputeBtn.onclick = function(){ state.disputingAnswerIndex = disputeKey; render(); };
+        }
+        block.appendChild(disputeBtn);
+      }
+    }
+    return block;
+  }
+
+  function renderUserHistory(){
+    var wrap = document.createElement('div');
+    var card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = '<div class="section-title">My quiz history</div>';
+
+    var filterRow = document.createElement('div');
+    filterRow.className = 'filter-row';
+    var titleFilterEl = document.createElement('div'); titleFilterEl.className = 'form-row';
+    titleFilterEl.innerHTML = '<label>Search by quiz title</label>';
+    var titleInput = document.createElement('input'); titleInput.type = 'text'; titleInput.placeholder = 'e.g. Daily Quiz';
+    titleInput.value = state.historySearchTitle;
+    titleInput.oninput = function(){ state.historySearchTitle = titleInput.value; titleSelect.value=''; renderHistoryList(); };
+    titleFilterEl.appendChild(titleInput);
+
+    var titleSelectEl = document.createElement('div'); titleSelectEl.className = 'form-row';
+    titleSelectEl.innerHTML = '<label>Or pick from your quizzes</label>';
+    var titleSelect = document.createElement('select');
+    var allOp = document.createElement('option'); allOp.value=''; allOp.textContent='All quizzes';
+    titleSelect.appendChild(allOp);
+    var myQuizTitles = [];
+    state.data.quizAttempts.filter(function(a){return a.userId===state.currentUserId;}).forEach(function(a){
+      if(myQuizTitles.indexOf(a.quizTitle) === -1) myQuizTitles.push(a.quizTitle);
+    });
+    myQuizTitles.sort().forEach(function(t){
+      var op = document.createElement('option'); op.value = t; op.textContent = t;
+      if(state.historySearchTitle === t) op.selected = true;
+      titleSelect.appendChild(op);
+    });
+    titleSelect.onchange = function(){ state.historySearchTitle = titleSelect.value; titleInput.value = titleSelect.value; renderHistoryList(); };
+    titleSelectEl.appendChild(titleSelect);
+
+    var dateFilterEl = document.createElement('div'); dateFilterEl.className = 'form-row';
+    dateFilterEl.innerHTML = '<label>Filter by date</label>';
+    var dateInput = document.createElement('input'); dateInput.type = 'date'; dateInput.value = state.historySearchDate;
+    dateInput.onchange = function(){ state.historySearchDate = dateInput.value; renderHistoryList(); };
+    dateFilterEl.appendChild(dateInput);
+    var clearBtn = document.createElement('button');
+    clearBtn.className = 'btn secondary small'; clearBtn.textContent = 'Clear filters';
+    clearBtn.onclick = function(){ state.historySearchTitle=''; state.historySearchDate=''; render(); };
+    filterRow.appendChild(titleFilterEl); filterRow.appendChild(titleSelectEl); filterRow.appendChild(dateFilterEl); filterRow.appendChild(clearBtn);
+    card.appendChild(filterRow);
+
+    var listHolder = document.createElement('div');
+    card.appendChild(listHolder);
+
+    function renderHistoryList(){
+      listHolder.innerHTML = '';
+      var myAttempts = state.data.quizAttempts.filter(function(a){return a.userId===state.currentUserId;});
+      if(state.historySearchTitle.trim()){
+        var q = state.historySearchTitle.trim().toLowerCase();
+        myAttempts = myAttempts.filter(function(a){ return a.quizTitle.toLowerCase().indexOf(q) !== -1; });
+      }
+      if(state.historySearchDate){
+        myAttempts = myAttempts.filter(function(a){ return a.quizDate === state.historySearchDate; });
+      }
+      myAttempts.sort(function(a,b){return b.finishedAt-a.finishedAt;});
+      if(myAttempts.length === 0){
+        listHolder.innerHTML = '<div class="empty-note">No matching quiz history.</div>';
+        return;
+      }
+      myAttempts.forEach(function(a){
+        var pct = Math.round(a.score/a.total*100);
+        var block = document.createElement('div');
+        block.style.cssText = 'border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;';
+        var head = document.createElement('div');
+        head.style.cssText = 'display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;';
+        head.innerHTML = '<div><div style="font-weight:700;font-size:14px;">'+escapeHtml(a.quizTitle)+'</div><div style="font-size:11px;color:var(--text-dim);">'+fmtDate(a.quizDate)+' &middot; completed '+fmtDateTime(a.finishedAt)+'</div></div>'+
+          '<div style="font-weight:700;font-size:15px;">'+a.score+' / '+a.total+' ('+pct+'%)</div>';
+        block.appendChild(head);
+
+        var toggleBtn = document.createElement('button');
+        toggleBtn.className = 'btn secondary small'; toggleBtn.style.marginTop = '10px';
+        toggleBtn.textContent = 'View questions & answers';
+        var reviewHolder = document.createElement('div');
+        reviewHolder.style.display = 'none';
+        reviewHolder.style.marginTop = '10px';
+        toggleBtn.onclick = function(){
+          var showing = reviewHolder.style.display !== 'none';
+          reviewHolder.style.display = showing ? 'none' : 'block';
+          toggleBtn.textContent = showing ? 'View questions & answers' : 'Hide questions & answers';
+        };
+        (a.answers||[]).forEach(function(ans, idx){
+          reviewHolder.appendChild(renderAnswerReviewBlock(a, ans, idx, 'hist-'+a.id));
+        });
+        block.appendChild(toggleBtn);
+        block.appendChild(reviewHolder);
+        listHolder.appendChild(block);
+      });
+    }
+    renderHistoryList();
+    wrap.appendChild(card);
+    return wrap;
+  }
+
+  /* ================= USER: CHANGE PASSWORD ================= */
+  function renderChangePassword(){
+    var wrap = document.createElement('div');
+    var card = document.createElement('div');
+    card.className = 'card';
+    card.style.maxWidth = '420px';
+    card.innerHTML = '<div class="section-title">Change your password</div>';
+
+    if(state.changePwError){
+      var err = document.createElement('div'); err.className = 'login-error'; err.textContent = state.changePwError;
+      card.appendChild(err);
+    }
+    if(state.changePwSuccess){
+      var ok = document.createElement('div');
+      ok.style.cssText = 'background:var(--green-bg);color:var(--green);font-size:12px;padding:9px 12px;border-radius:8px;margin-bottom:14px;';
+      ok.textContent = 'Your password has been updated.';
+      card.appendChild(ok);
+    }
+    var curInput = document.createElement('input'); curInput.type = 'password';
+    var newInput = document.createElement('input'); newInput.type = 'password';
+    var confirmInput = document.createElement('input'); confirmInput.type = 'password';
+    function row(labelText, el){
+      var r = document.createElement('div'); r.className = 'form-row';
+      var l = document.createElement('label'); l.textContent = labelText;
+      r.appendChild(l); r.appendChild(el);
+      return r;
+    }
+    card.appendChild(row('Current password', curInput));
+    card.appendChild(row('New password', newInput));
+    card.appendChild(row('Confirm new password', confirmInput));
+
+    var saveBtn = document.createElement('button');
+    saveBtn.className = 'btn primary';
+    saveBtn.textContent = 'Update password';
+    saveBtn.onclick = function(){
+      var user = currentUser();
+      if(curInput.value !== user.password){ state.changePwError = 'Your current password is incorrect.'; state.changePwSuccess = false; render(); return; }
+      if(!newInput.value || newInput.value.length < 6){ state.changePwError = 'New password must be at least 6 characters.'; state.changePwSuccess = false; render(); return; }
+      if(newInput.value !== confirmInput.value){ state.changePwError = 'New password and confirmation do not match.'; state.changePwSuccess = false; render(); return; }
+      user.password = newInput.value; user.mustChangePassword = false;
+      state.changePwError = ''; state.changePwSuccess = true;
+      saveData(); render();
+    };
+    card.appendChild(saveBtn);
+    wrap.appendChild(card);
+    return wrap;
+  }
+
+  /* ================= QUIZ TAKING ================= */
+  function openQuiz(quiz){
+    var qs = {
+      quiz: quiz,
+      questions: quiz.questionIds.map(function(id){ return state.data.questionBank.find(function(q){return q.id===id;}); }).filter(Boolean),
+      index: 0, selections: {}, done: false,
+      startedAt: Date.now(), deadline: Date.now() + quiz.durationMinutes*60000,
+      attemptId: null
+    };
+    state.quizSession = qs;
+    render();
+  }
+
+  var quizTimerInterval = null;
+  function startQuizModalTimer(){
+    if(quizTimerInterval) clearInterval(quizTimerInterval);
+    function tick(){
+      var el = document.getElementById('quizTimer');
+      var qs = state.quizSession;
+      if(!el || !qs || qs.done){ clearInterval(quizTimerInterval); return; }
+      var diff = Math.max(0, qs.deadline - Date.now());
+      var m = Math.floor(diff/60000);
+      var s = Math.floor((diff%60000)/1000);
+      function p(n){ return n<10 ? '0'+n : ''+n; }
+      el.textContent = m+':'+p(s);
+      el.classList.toggle('low', diff <= 30000);
+      if(diff <= 0){
+        clearInterval(quizTimerInterval);
+        finishQuiz();
+      }
+    }
+    tick();
+    quizTimerInterval = setInterval(tick, 1000);
+  }
+
+  function renderQuizModal(){
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    var box = document.createElement('div');
+    box.className = 'modal-box';
+    var qs = state.quizSession;
+
+    if(!qs.done){
+      var head = document.createElement('div');
+      head.className = 'modal-head';
+      head.innerHTML = '<div class="modal-title">'+escapeHtml(qs.quiz.title)+'</div><span class="quiz-timer" id="quizTimer"></span>';
+      box.appendChild(head);
+      startQuizModalTimer();
+
+      var dots = document.createElement('div');
+      dots.className = 'quiz-dots';
+      qs.questions.forEach(function(q, i){
+        var dot = document.createElement('div');
+        dot.className = 'quiz-dot' + (i===qs.index?' current':'') + (qs.selections[i]!==undefined?' answered':'');
+        dot.textContent = i+1;
+        dot.onclick = function(){ qs.index = i; render(); };
+        dots.appendChild(dot);
+      });
+      box.appendChild(dots);
+
+      var progress = document.createElement('div');
+      progress.className = 'quiz-progress';
+      progress.textContent = 'Question ' + (qs.index+1) + ' of ' + qs.questions.length;
+      box.appendChild(progress);
+
+      var q = qs.questions[qs.index];
+      var qEl = document.createElement('div');
+      qEl.className = 'quiz-question';
+      qEl.textContent = q.question;
+      box.appendChild(qEl);
+
+      q.options.forEach(function(opt, i){
+        var b = document.createElement('button');
+        b.className = 'quiz-option' + (qs.selections[qs.index]===i ? ' selected' : '');
+        b.textContent = opt;
+        b.onclick = function(){ qs.selections[qs.index] = i; render(); };
+        box.appendChild(b);
+      });
+
+      var navRow = document.createElement('div');
+      navRow.className = 'quiz-nav-row';
+      var prevBtn = document.createElement('button');
+      prevBtn.className = 'btn secondary'; prevBtn.textContent = '\u2190 Previous';
+      prevBtn.disabled = qs.index === 0;
+      prevBtn.onclick = function(){ qs.index -= 1; render(); };
+      navRow.appendChild(prevBtn);
+
+      var isLast = qs.index === qs.questions.length - 1;
+      var nextBtn = document.createElement('button');
+      nextBtn.className = 'btn primary';
+      nextBtn.textContent = isLast ? 'Submit quiz' : 'Next \u2192';
+      nextBtn.onclick = function(){
+        if(isLast){
+          var unanswered = qs.questions.length - Object.keys(qs.selections).length;
+          if(unanswered > 0){
+            if(!confirm(unanswered + ' question(s) are still unanswered. Submit anyway?')) return;
+          }
+          finishQuiz();
+        }else{
+          qs.index += 1; render();
+        }
+      };
+      navRow.appendChild(nextBtn);
+      box.appendChild(navRow);
+
+      var submitNowBtn = document.createElement('button');
+      submitNowBtn.className = 'btn secondary small';
+      submitNowBtn.style.marginTop = '10px';
+      submitNowBtn.textContent = 'Submit quiz now';
+      submitNowBtn.onclick = function(){
+        var unanswered = qs.questions.length - Object.keys(qs.selections).length;
+        var msg = unanswered > 0 ? unanswered + ' question(s) are still unanswered. Submit anyway?' : 'Submit the quiz now?';
+        if(confirm(msg)) finishQuiz();
+      };
+      box.appendChild(submitNowBtn);
+    }else{
+      var user = currentUser();
+      var head2 = document.createElement('div');
+      head2.className = 'modal-head';
+      head2.innerHTML = '<div class="modal-title">Quiz complete</div>';
+      box.appendChild(head2);
+      var result = document.createElement('div');
+      result.className = 'quiz-result';
+      result.innerHTML = '<div class="score">'+qs.finalScore+' / '+qs.questions.length+'</div><div style="font-size:12px;color:var(--text-dim);margin-top:8px;">Your result has been saved. You can review it anytime under My History.</div>';
+      box.appendChild(result);
+
+      var reviewTitle = document.createElement('div');
+      reviewTitle.className = 'section-title';
+      reviewTitle.textContent = 'Review your answers';
+      box.appendChild(reviewTitle);
+
+      var attempt = state.data.quizAttempts.find(function(a){return a.id===qs.attemptId;});
+      if(attempt){
+        attempt.answers.forEach(function(ans, idx){
+          box.appendChild(renderAnswerReviewBlock(attempt, ans, idx, 'live-'+attempt.id));
+        });
+      }
+
+      var doneBtn = document.createElement('button');
+      doneBtn.className = 'btn primary'; doneBtn.style.marginTop = '6px'; doneBtn.textContent = 'Close';
+      doneBtn.onclick = function(){ state.quizSession = null; state.disputingAnswerIndex = null; state.tab = 'history'; render(); };
+      box.appendChild(doneBtn);
+    }
+    overlay.appendChild(box);
+    return overlay;
+  }
+
+  function finishQuiz(){
+    var qs = state.quizSession;
+    if(qs.done) return;
+    var user = currentUser();
+    var score = 0;
+    var answers = qs.questions.map(function(q, i){
+      var selIndex = qs.selections[i];
+      var hasSelection = selIndex !== undefined;
+      var isCorrect = hasSelection && isAnswerAccepted(q, selIndex);
+      if(isCorrect) score += 1;
+      return {
+        questionId: q.id, questionText: q.question, options: q.options,
+        selectedIndex: hasSelection ? selIndex : -1,
+        correctIndex: q.correctIndex,
+        selectedOption: hasSelection ? q.options[selIndex] : 'No answer given',
+        correctOption: q.options[q.correctIndex],
+        isCorrect: isCorrect
+      };
+    });
+    var attempt = {
+      id: uid(), quizId: qs.quiz.id, quizTitle: qs.quiz.title, quizDate: qs.quiz.scheduledDate,
+      userId: state.currentUserId, userName: user.name, userEmail: user.email, team: user.team,
+      score: score, total: qs.questions.length, date: new Date().toISOString().slice(0,10),
+      finishedAt: Date.now(), answers: answers
+    };
+    state.data.quizAttempts.push(attempt);
+    if(!state.data.userCompletedQuizzes[state.currentUserId]) state.data.userCompletedQuizzes[state.currentUserId] = [];
+    state.data.userCompletedQuizzes[state.currentUserId].push(qs.quiz.id);
+    qs.attemptId = attempt.id;
+    qs.finalScore = score;
+    qs.done = true;
+    saveData();
+    render();
+  }
+
+  loadData();
+})();
+</script>
+</body>
+</html>
