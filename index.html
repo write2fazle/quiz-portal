@@ -396,178 +396,200 @@ table.data-table tr:last-child td{border-bottom:none;}
   }
 
   /* ================= SUPABASE DATA BRIDGE ================= */
-  /*
-   * Vercel/static hosting cannot use google.script.run.
-   * This bridge reads/writes the existing Supabase tables while keeping
-   * the portal's original in-memory data model unchanged.
-   *
-   * IMPORTANT: replace SUPABASE_PUBLISHABLE_KEY with your Supabase
-   * Publishable/anon key before deploying. Do NOT use the service_role key.
-   */
+  // Vercel/static hosting cannot use google.script.run.
+  // This bridge reads/writes the existing Supabase tables without changing
+  // the rest of the Quiz Portal UI and business logic.
   var SUPABASE_URL = 'https://mpmkmmejjoubdakwsvak.supabase.co';
   var SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_ttF9g-dJMJk7dghB0mRTTA_GdSLt2AW';
-  var sbConnectionError = '';
-  var SUPABASE_HEADERS = {
+
+  var SUPA_HEADERS = {
     'apikey': SUPABASE_PUBLISHABLE_KEY,
     'Authorization': 'Bearer ' + SUPABASE_PUBLISHABLE_KEY,
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation'
   };
 
-  var SB_TABLES = {
-    users: 'users',
-    teams: 'teams',
-    questionBank: 'question_bank',
-    quizzes: 'quizzes',
-    quizAttempts: 'quiz_attempts',
-    disputes: 'disputes',
-    knowledgeUpdates: 'knowledge_updates',
-    meta: 'meta'
-  };
+  function supaUrl(table, query){
+    return SUPABASE_URL + '/rest/v1/' + table + (query || '');
+  }
 
-  function sbFetch(path, options){
+  async function supaRequest(url, options){
     options = options || {};
-    var headers = Object.assign({}, SUPABASE_HEADERS, options.headers || {});
-    return fetch(SUPABASE_URL + '/rest/v1/' + path, Object.assign({}, options, {headers: headers}))
-      .then(async function(res){
-        var text = await res.text();
-        if(!res.ok){
-          var msg = text || (res.status + ' ' + res.statusText);
-          throw new Error('Supabase ' + res.status + ': ' + msg);
-        }
-        return text ? JSON.parse(text) : null;
-      });
-  }
-
-  function sbParseData(value, fallback){
-    if(value == null || value === '') return fallback;
-    if(typeof value === 'object') return value;
-    try { return JSON.parse(value); } catch(e) { return fallback; }
-  }
-
-  function sbReadRows(table){
-    return sbFetch(table + '?select=id,data&order=created_at.asc');
-  }
-
-  function sbReadAllData(){
-    return Promise.all([
-      sbReadRows(SB_TABLES.users),
-      sbReadRows(SB_TABLES.teams),
-      sbReadRows(SB_TABLES.questionBank),
-      sbReadRows(SB_TABLES.quizzes),
-      sbReadRows(SB_TABLES.quizAttempts),
-      sbReadRows(SB_TABLES.disputes),
-      sbReadRows(SB_TABLES.knowledgeUpdates),
-      sbReadRows(SB_TABLES.meta)
-    ]).then(function(rows){
-      var out = {
-        teams: [], users: [], questionBank: [], quizzes: [], quizAttempts: [],
-        disputes: [], knowledgeUpdates: [], teamUsedQuestionIds: {},
-        userCompletedQuizzes: {}, userSeenKnowledgeUpdates: {}, userLogins: {}
-      };
-
-      // Teams table: support both {data:'Inbound'} and JSON string/object formats.
-      (rows[1] || []).forEach(function(r){
-        var v = sbParseData(r.data, r.data);
-        if(typeof v === 'string' && v.trim()) out.teams.push(v);
-        else if(v && typeof v.name === 'string') out.teams.push(v.name);
-        else if(Array.isArray(v)) v.forEach(function(x){ if(x) out.teams.push(String(x)); });
-      });
-
-      var keys = ['users','questionBank','quizzes','quizAttempts','disputes','knowledgeUpdates'];
-      [0,2,3,4,5,6].forEach(function(idx, i){
-        var key = keys[i];
-        out[key] = (rows[idx] || []).map(function(r){
-          var v = sbParseData(r.data, null);
-          if(v && typeof v === 'object' && !Array.isArray(v)) {
-            if(!v.id) v.id = r.id;
-            return v;
-          }
-          return null;
-        }).filter(Boolean);
-      });
-
-      // Meta table: support {key,value}, {key:..., value:...}, or legacy {key:...}.
-      (rows[7] || []).forEach(function(r){
-        var v = sbParseData(r.data, null);
-        var metaKey = v && (v.key || v.name);
-        var metaValue = v && Object.prototype.hasOwnProperty.call(v,'value') ? v.value : v;
-        if(metaKey && ['teamUsedQuestionIds','userCompletedQuizzes','userSeenKnowledgeUpdates','userLogins'].indexOf(metaKey) !== -1){
-          out[metaKey] = metaValue || {};
-        } else if(v && typeof v === 'object'){
-          ['teamUsedQuestionIds','userCompletedQuizzes','userSeenKnowledgeUpdates','userLogins'].forEach(function(k){
-            if(Object.prototype.hasOwnProperty.call(v,k)) out[k] = v[k] || {};
-          });
-        }
-      });
-
-      return JSON.stringify(out);
-    });
-  }
-
-  function sbSaveRows(table, items){
-    // Upsert current records. Deletions are handled by the optional delete
-    // pass below and therefore require DELETE RLS permission.
-    var rows = (items || []).map(function(item){
-      return {id: item.id || uid(), data: item};
-    });
-    if(!rows.length) return Promise.resolve();
-    return sbFetch(SB_TABLES[table] + '?on_conflict=id', {
-      method:'POST',
-      headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},
-      body:JSON.stringify(rows)
-    });
-  }
-
-  function sbSaveTeams(teams){
-    var rows = (teams || []).map(function(name){ return {id: uid(), data: String(name)}; });
-    if(!rows.length) return Promise.resolve();
-    return sbFetch(SB_TABLES.teams + '?on_conflict=id', {
-      method:'POST',
-      headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},
-      body:JSON.stringify(rows)
-    });
-  }
-
-  function sbSaveMetaKey(key, value){
-    var row = {id: key, data:{key:key, value:value}};
-    return sbFetch(SB_TABLES.meta + '?on_conflict=id', {
-      method:'POST',
-      headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},
-      body:JSON.stringify([row])
-    });
-  }
-
-  function gsGetAllData(){
-    if(!SUPABASE_PUBLISHABLE_KEY || SUPABASE_PUBLISHABLE_KEY.indexOf('PASTE_') === 0){
-      sbConnectionError = 'Supabase Publishable Key is not configured in index.html.';
-      console.error(sbConnectionError);
-      return Promise.resolve(null);
+    options.headers = Object.assign({}, SUPA_HEADERS, options.headers || {});
+    var response = await fetch(url, options);
+    var text = await response.text();
+    var body = null;
+    try { body = text ? JSON.parse(text) : null; } catch(e) { body = text; }
+    if(!response.ok){
+      var msg = body && body.message ? body.message : text || ('HTTP ' + response.status);
+      throw new Error('Supabase ' + response.status + ': ' + msg);
     }
-    return sbReadAllData().catch(function(err){
-      sbConnectionError = err.message || 'Supabase connection failed.';
-      console.error('Supabase load error:', err);
-      return null;
+    return body;
+  }
+
+  function parseJsonValue(v, fallback){
+    if(v === null || v === undefined || v === '') return fallback;
+    if(typeof v === 'object') return v;
+    try { return JSON.parse(v); } catch(e) { return fallback; }
+  }
+
+  function clone(obj){ return JSON.parse(JSON.stringify(obj)); }
+
+  async function readJsonCollection(table){
+    var rows = await supaRequest(supaUrl(table, '?select=id,data,created_at,updated_at&order=created_at.asc'));
+    return (rows || []).map(function(row){
+      var obj = parseJsonValue(row.data, null);
+      if(!obj || typeof obj !== 'object') obj = {id: row.id};
+      if(!obj.id) obj.id = row.id;
+      return obj;
     });
   }
 
-  function gsSaveChanged(payloadObj){
-    if(!SUPABASE_PUBLISHABLE_KEY || SUPABASE_PUBLISHABLE_KEY.indexOf('PASTE_') === 0) return Promise.resolve(false);
-    var jobs = [];
-    if(payloadObj.teams) jobs.push(sbSaveTeams(payloadObj.teams));
-    if(payloadObj.users) jobs.push(sbSaveRows('users', payloadObj.users));
-    if(payloadObj.questionBank) jobs.push(sbSaveRows('questionBank', payloadObj.questionBank));
-    if(payloadObj.quizzes) jobs.push(sbSaveRows('quizzes', payloadObj.quizzes));
-    if(payloadObj.quizAttempts) jobs.push(sbSaveRows('quizAttempts', payloadObj.quizAttempts));
-    if(payloadObj.disputes) jobs.push(sbSaveRows('disputes', payloadObj.disputes));
-    if(payloadObj.knowledgeUpdates) jobs.push(sbSaveRows('knowledgeUpdates', payloadObj.knowledgeUpdates));
-    ['teamUsedQuestionIds','userCompletedQuizzes','userSeenKnowledgeUpdates','userLogins'].forEach(function(k){
-      if(Object.prototype.hasOwnProperty.call(payloadObj,k)) jobs.push(sbSaveMetaKey(k, payloadObj[k]));
+  async function readTeams(){
+    var rows = await supaRequest(supaUrl('teams', '?select=ID,Name,Created&order=Created.asc'));
+    return (rows || []).map(function(row){ return row.Name || row.name || row.NAME || ''; }).filter(Boolean);
+  }
+
+  async function readUsers(){
+    // Current Users table is a simple ID/Name/Created table. If a future
+    // version contains a JSON data column, use it automatically.
+    try{
+      var rows = await supaRequest(supaUrl('users', '?select=id,name,created_at'));
+      return (rows || []).map(function(row){
+        return {
+          id: row.id,
+          name: row.name || '',
+          email: '',
+          password: '',
+          role: 'User',
+          team: null,
+          mustChangePassword: false,
+          photo: null
+        };
+      });
+    }catch(e){
+      var rows2 = await supaRequest(supaUrl('users', '?select=id,data,created_at,updated_at'));
+      return (rows2 || []).map(function(row){
+        var obj = parseJsonValue(row.data, {id: row.id});
+        if(!obj.id) obj.id = row.id;
+        return obj;
+      });
+    }
+  }
+
+  async function readMeta(){
+    var rows = await supaRequest(supaUrl('meta', '?select=key,value,updated_at'));
+    var out = {};
+    (rows || []).forEach(function(row){
+      out[row.key] = parseJsonValue(row.value, {});
     });
-    return Promise.all(jobs).then(function(){ return true; }).catch(function(err){
-      console.error('Supabase save error:', err);
-      alert('Supabase save failed. Check RLS policies.\n\n' + err.message);
-      return false;
+    return out;
+  }
+
+  async function supabaseGetAllData(){
+    if(!SUPABASE_PUBLISHABLE_KEY || SUPABASE_PUBLISHABLE_KEY.indexOf('sb_publishable_') !== 0){
+      throw new Error('Supabase Publishable Key is not configured correctly in index.html.');
+    }
+
+    var results = await Promise.all([
+      readUsers(),
+      readTeams(),
+      readJsonCollection('question_bank'),
+      readJsonCollection('quizzes'),
+      readJsonCollection('quiz_attempts'),
+      readJsonCollection('disputes'),
+      readJsonCollection('knowledge_updates'),
+      readMeta()
+    ]);
+
+    var meta = results[7];
+    var out = {
+      users: results[0],
+      teams: results[1],
+      questionBank: results[2],
+      quizzes: results[3],
+      quizAttempts: results[4],
+      disputes: results[5],
+      knowledgeUpdates: results[6],
+      teamUsedQuestionIds: meta.teamUsedQuestionIds || {},
+      userCompletedQuizzes: meta.userCompletedQuizzes || {},
+      userSeenKnowledgeUpdates: meta.userSeenKnowledgeUpdates || {},
+      userLogins: meta.userLogins || {}
+    };
+    return JSON.stringify(out);
+  }
+
+  async function upsertJsonCollection(table, items){
+    items = items || [];
+    var rows = items.map(function(item){
+      return {id: item.id || uid(), data: JSON.stringify(item), updated_at: new Date().toISOString()};
     });
+
+    // Replace the collection so deletions made in the portal are reflected.
+    await supaRequest(supaUrl(table, '?id=not.is.null'), {method:'DELETE'});
+    if(rows.length){
+      await supaRequest(supaUrl(table), {method:'POST', body: JSON.stringify(rows)});
+    }
+  }
+
+  async function saveTeams(items){
+    var current = await supaRequest(supaUrl('teams', '?select=ID'));
+    if(current && current.length){
+      await supaRequest(supaUrl('teams', '?ID=not.is.null'), {method:'DELETE'});
+    }
+    var rows = (items || []).map(function(name){
+      return {Name:name, Created:new Date().toISOString()};
+    });
+    if(rows.length) await supaRequest(supaUrl('teams'), {method:'POST', body:JSON.stringify(rows)});
+  }
+
+  async function saveMetaKey(key, value){
+    await supaRequest(supaUrl('meta', '?key=eq.' + encodeURIComponent(key)), {
+      method:'DELETE'
+    });
+    await supaRequest(supaUrl('meta'), {
+      method:'POST',
+      body:JSON.stringify({key:key, value:JSON.stringify(value), updated_at:new Date().toISOString()})
+    });
+  }
+
+  async function saveUsers(items){
+    // The current Users table only has id/name/created_at. Preserve the
+    // existing table shape and write names. Full login fields will require
+    // a later Supabase Auth/users profile migration.
+    var current = await supaRequest(supaUrl('users', '?select=id'));
+    if(current && current.length){
+      await supaRequest(supaUrl('users', '?id=not.is.null'), {method:'DELETE'});
+    }
+    var rows = (items || []).map(function(u){
+      return {id:u.id || uid(), name:u.name || '', created_at:new Date().toISOString()};
+    });
+    if(rows.length) await supaRequest(supaUrl('users'), {method:'POST', body:JSON.stringify(rows)});
+  }
+
+  async function supabaseSaveChanged(payloadObj){
+    var keys = Object.keys(payloadObj || {});
+    for(var i=0;i<keys.length;i++){
+      var key = keys[i];
+      if(key === 'teams') await saveTeams(payloadObj[key]);
+      else if(key === 'users') await saveUsers(payloadObj[key]);
+      else if(key === 'questionBank') await upsertJsonCollection('question_bank', payloadObj[key]);
+      else if(key === 'quizzes') await upsertJsonCollection('quizzes', payloadObj[key]);
+      else if(key === 'quizAttempts') await upsertJsonCollection('quiz_attempts', payloadObj[key]);
+      else if(key === 'disputes') await upsertJsonCollection('disputes', payloadObj[key]);
+      else if(key === 'knowledgeUpdates') await upsertJsonCollection('knowledge_updates', payloadObj[key]);
+      else if(key === 'teamUsedQuestionIds' || key === 'userCompletedQuizzes' || key === 'userSeenKnowledgeUpdates' || key === 'userLogins'){
+        await saveMetaKey(key, payloadObj[key]);
+      }
+    }
+    return true;
+  }
+
+  async function gsGetAllData(){
+    return await supabaseGetAllData();
+  }
+  async function gsSaveChanged(payloadObj){
+    return await supabaseSaveChanged(payloadObj);
   }
 
   function normalizeData(d){
@@ -598,16 +620,9 @@ table.data-table tr:last-child td{border-bottom:none;}
     var fresh = null;
     try{ fresh = raw ? JSON.parse(raw) : null; }catch(e){ fresh = null; }
 
-    if(sbConnectionError){
-      state.data = null;
-      render();
-      return;
-    }
-
     var isEmpty = !fresh || !fresh.users || fresh.users.length === 0;
     if(isEmpty){
-      // Supabase is connected but the database has no users yet. Keep the
-      // original seed behavior available for a brand-new database.
+      // First-ever run against this database: seed every tab at once.
       state.data = normalizeData(defaultData());
       var seedPayload = {};
       SYNC_KEYS.forEach(function(k){ seedPayload[k] = state.data[k]; });
@@ -727,18 +742,6 @@ table.data-table tr:last-child td{border-bottom:none;}
   function render(){
     var root = document.getElementById('app');
     root.innerHTML = '';
-
-    if(sbConnectionError){
-      var errWrap = document.createElement('div');
-      errWrap.className = 'login-wrap';
-      var errCard = document.createElement('div');
-      errCard.className = 'login-card';
-      errCard.innerHTML = '<div style="font-size:22px;font-weight:700;color:var(--red);margin-bottom:10px;">Supabase connection error</div>' +
-        '<div style="font-size:13px;line-height:1.6;color:var(--text-dim);">'+escapeHtml(sbConnectionError)+'</div>' +
-        '<div style="font-size:12px;line-height:1.6;color:var(--text-mute);margin-top:14px;">Check the Publishable Key in index.html and the Users SELECT RLS policy, then refresh this page.</div>' +
-        '<button class="btn primary btn-full" style="margin-top:18px;" onclick="location.reload()">Retry</button>';
-      errWrap.appendChild(errCard); root.appendChild(errWrap); return;
-    }
 
     if(!state.currentUserId){
       root.appendChild(renderLogin());
@@ -1893,7 +1896,7 @@ table.data-table tr:last-child td{border-bottom:none;}
 
     var restoreCard = document.createElement('div');
     restoreCard.className = 'card';
-    restoreCard.innerHTML = '<div class="section-title">Restore from a snapshot</div><div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">This replaces the portal data currently stored in Supabase with the contents of the snapshot file. Anything created since that snapshot will be lost.</div>';
+    restoreCard.innerHTML = '<div class="section-title">Restore from a snapshot</div><div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">This replaces everything currently in the Google Sheet with the contents of the snapshot file. Anything created since that snapshot will be lost.</div>';
     var fileInput = document.createElement('input');
     fileInput.type = 'file'; fileInput.accept = '.json,application/json';
     fileInput.style.marginBottom = '10px';
@@ -1913,7 +1916,7 @@ table.data-table tr:last-child td{border-bottom:none;}
           state.data = normalizeData(parsed);
           state.lastSyncedData = null; // force every collection to be treated as changed
           await saveData();
-          alert('Snapshot restored to Supabase. The page will now reload.');
+          alert('Snapshot restored to the Google Sheet. The page will now reload.');
           location.reload();
         }catch(e){
           alert('Could not read this file. Make sure it\u2019s a Quiz Portal snapshot (.json) file.');
