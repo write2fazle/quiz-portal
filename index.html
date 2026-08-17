@@ -446,11 +446,10 @@ table.data-table tr:last-child td{border-bottom:none;}
   }
 
   async function readTeams(){
-    // Use select=* because the existing Teams table uses a simple
-    // ID/Name/Created-style structure and the exact casing may differ.
-    var rows = await supaRequest(supaUrl('teams', '?select=*'));
+    // Current Supabase schema: public.teams(id uuid, name text, created_at timestamptz)
+    var rows = await supaRequest(supaUrl('teams', '?select=id,name,created_at&order=name.asc'));
     return (rows || []).map(function(row){
-      return row.Name || row.name || row.NAME || row.team_name || row.TeamName || '';
+      return row.name || '';
     }).filter(Boolean);
   }
 
@@ -533,12 +532,13 @@ table.data-table tr:last-child td{border-bottom:none;}
   }
 
   async function saveTeams(items){
-    var current = await supaRequest(supaUrl('teams', '?select=ID'));
+    // Current Supabase schema: public.teams(id uuid, name text, created_at timestamptz)
+    var current = await supaRequest(supaUrl('teams', '?select=id'));
     if(current && current.length){
-      await supaRequest(supaUrl('teams', '?ID=not.is.null'), {method:'DELETE'});
+      await supaRequest(supaUrl('teams', '?id=not.is.null'), {method:'DELETE'});
     }
     var rows = (items || []).map(function(name){
-      return {Name:name, Created:new Date().toISOString()};
+      return {id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : uid(), name:name, created_at:new Date().toISOString()};
     });
     if(rows.length) await supaRequest(supaUrl('teams'), {method:'POST', body:JSON.stringify(rows)});
   }
@@ -554,17 +554,22 @@ table.data-table tr:last-child td{border-bottom:none;}
   }
 
   async function saveUsers(items){
-    // The current Users table only has id/name/created_at. Preserve the
-    // existing table shape and write names. Full login fields will require
-    // a later Supabase Auth/users profile migration.
-    var current = await supaRequest(supaUrl('users', '?select=id'));
-    if(current && current.length){
-      await supaRequest(supaUrl('users', '?id=not.is.null'), {method:'DELETE'});
-    }
+    // Current Supabase schema: public.users(id text, data jsonb, created_at, updated_at).
+    // Preserve the complete user object inside data so email/password/role/team
+    // and mustChangePassword are never lost.
     var rows = (items || []).map(function(u){
-      return {id:u.id || uid(), name:u.name || '', created_at:new Date().toISOString()};
+      var id = u.id || uid();
+      var copy = clone(u);
+      copy.id = id;
+      return {id:id, data:JSON.stringify(copy), updated_at:new Date().toISOString()};
     });
-    if(rows.length) await supaRequest(supaUrl('users'), {method:'POST', body:JSON.stringify(rows)});
+    if(rows.length){
+      await supaRequest(supaUrl('users') + '?on_conflict=id', {
+        method:'POST',
+        headers:{'Prefer':'resolution=merge-duplicates,return=representation'},
+        body:JSON.stringify(rows)
+      });
+    }
   }
 
   async function supabaseSaveChanged(payloadObj){
