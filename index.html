@@ -446,35 +446,35 @@ table.data-table tr:last-child td{border-bottom:none;}
   }
 
   async function readTeams(){
-    var rows = await supaRequest(supaUrl('teams', '?select=ID,Name,Created&order=Created.asc'));
-    return (rows || []).map(function(row){ return row.Name || row.name || row.NAME || ''; }).filter(Boolean);
+    // Use select=* because the existing Teams table uses a simple
+    // ID/Name/Created-style structure and the exact casing may differ.
+    var rows = await supaRequest(supaUrl('teams', '?select=*'));
+    return (rows || []).map(function(row){
+      return row.Name || row.name || row.NAME || row.team_name || row.TeamName || '';
+    }).filter(Boolean);
   }
 
   async function readUsers(){
-    // Current Users table is a simple ID/Name/Created table. If a future
-    // version contains a JSON data column, use it automatically.
-    try{
-      var rows = await supaRequest(supaUrl('users', '?select=id,name,created_at'));
-      return (rows || []).map(function(row){
-        return {
-          id: row.id,
-          name: row.name || '',
-          email: '',
-          password: '',
-          role: 'User',
-          team: null,
-          mustChangePassword: false,
-          photo: null
-        };
-      });
-    }catch(e){
-      var rows2 = await supaRequest(supaUrl('users', '?select=id,data,created_at,updated_at'));
-      return (rows2 || []).map(function(row){
+    // Use select=* so this works with the current simple Users table
+    // (id/name/created_at) without assuming a JSON data column.
+    var rows = await supaRequest(supaUrl('users', '?select=*'));
+    return (rows || []).map(function(row){
+      if(row.data !== undefined && row.data !== null){
         var obj = parseJsonValue(row.data, {id: row.id});
         if(!obj.id) obj.id = row.id;
         return obj;
-      });
-    }
+      }
+      return {
+        id: row.id,
+        name: row.name || row.Name || '',
+        email: row.email || '',
+        password: row.password || '',
+        role: row.role || 'User',
+        team: row.team || null,
+        mustChangePassword: !!row.mustChangePassword,
+        photo: row.photo || null
+      };
+    });
   }
 
   async function readMeta(){
@@ -616,11 +616,12 @@ table.data-table tr:last-child td{border-bottom:none;}
   }
 
   async function loadData(){
-    var raw = await gsGetAllData();
-    var fresh = null;
-    try{ fresh = raw ? JSON.parse(raw) : null; }catch(e){ fresh = null; }
+    try{
+      var raw = await gsGetAllData();
+      var fresh = null;
+      try{ fresh = raw ? JSON.parse(raw) : null; }catch(e){ fresh = null; }
 
-    var isEmpty = !fresh || !fresh.users || fresh.users.length === 0;
+      var isEmpty = !fresh || !fresh.users || fresh.users.length === 0;
     if(isEmpty){
       // First-ever run against this database: seed every tab at once.
       state.data = normalizeData(defaultData());
@@ -637,7 +638,21 @@ table.data-table tr:last-child td{border-bottom:none;}
       var u = state.data.users.find(function(x){return x.id===session;});
       if(u) state.currentUserId = u.id;
     }
-    render();
+      render();
+    }catch(e){
+      console.error('Quiz Portal startup error:', e);
+      var root = document.getElementById('app');
+      if(root){
+        root.innerHTML = '<div style="max-width:760px;margin:60px auto;padding:24px;background:#fff;border:1px solid #e3e6eb;border-radius:14px;font-family:Arial,sans-serif;">' +
+          '<h2 style="margin:0 0 12px;color:#c0392b;">Supabase connection error</h2>' +
+          '<p style="margin:0 0 12px;">The portal could not load its data. The exact error is:</p>' +
+          '<pre style="white-space:pre-wrap;background:#f5f6f8;padding:14px;border-radius:10px;overflow:auto;">' +
+          String(e && e.message ? e.message : e) +
+          '</pre>' +
+          '<p style="margin:12px 0 0;color:#666;">Please send this exact error to the assistant before changing any database settings.</p>' +
+          '</div>';
+      }
+    }
   }
 
   var saveInFlight = false;
