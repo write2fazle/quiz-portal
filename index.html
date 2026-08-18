@@ -612,6 +612,28 @@ table.data-table tr:last-child td{border-bottom:none;}
     d.questionBank.forEach(function(q){
       if(!q.acceptedIndexes) q.acceptedIndexes = [q.correctIndex];
     });
+
+    // Build the completed-quiz index from quiz_attempts every time data loads.
+    // This is the authoritative source, so users who completed a quiz before
+    // the userCompletedQuizzes meta key existed will still be blocked.
+    var completedMap = {};
+    (d.quizAttempts || []).forEach(function(attempt){
+      if(!attempt || !attempt.userId || !attempt.quizId) return;
+      if(!completedMap[attempt.userId]) completedMap[attempt.userId] = [];
+      if(completedMap[attempt.userId].indexOf(attempt.quizId) === -1){
+        completedMap[attempt.userId].push(attempt.quizId);
+      }
+    });
+    Object.keys(d.userCompletedQuizzes || {}).forEach(function(userId){
+      if(!completedMap[userId]) completedMap[userId] = [];
+      (d.userCompletedQuizzes[userId] || []).forEach(function(quizId){
+        if(completedMap[userId].indexOf(quizId) === -1){
+          completedMap[userId].push(quizId);
+        }
+      });
+    });
+    d.userCompletedQuizzes = completedMap;
+
     d.users.forEach(function(u){
       if(u.team === undefined) u.team = null;
       if(u.photo === undefined) u.photo = null;
@@ -2317,7 +2339,11 @@ table.data-table tr:last-child td{border-bottom:none;}
     card.innerHTML = '<div class="section-title">Available quizzes for '+escapeHtml(user.team)+'</div>';
 
     var completed = state.data.userCompletedQuizzes[state.currentUserId] || [];
-    var available = state.data.quizzes.filter(function(q){ return q.team === user.team && quizStatus(q) !== 'off'; });
+    var available = state.data.quizzes.filter(function(q){
+      return q.team === user.team &&
+             quizStatus(q) !== 'off' &&
+             completed.indexOf(q.id) === -1;
+    });
     if(available.length === 0){
       card.innerHTML += '<div class="empty-note">No quizzes have been scheduled for your team yet.</div>';
     }else{
@@ -2543,6 +2569,15 @@ table.data-table tr:last-child td{border-bottom:none;}
 
   /* ================= QUIZ TAKING ================= */
   function openQuiz(quiz){
+    var userId = state.currentUserId;
+    var alreadyAttempted = (state.data.quizAttempts || []).some(function(attempt){
+      return attempt && attempt.userId === userId && attempt.quizId === quiz.id;
+    });
+    if(alreadyAttempted){
+      notify('You have already completed this quiz.','error');
+      return;
+    }
+
     var qs = {
       quiz: quiz,
       questions: quiz.questionIds.map(function(id){ return state.data.questionBank.find(function(q){return q.id===id;}); }).filter(Boolean),
@@ -2688,10 +2723,24 @@ table.data-table tr:last-child td{border-bottom:none;}
     return overlay;
   }
 
-  function finishQuiz(){
+  async function finishQuiz(){
     var qs = state.quizSession;
     if(qs.done) return;
+
     var user = currentUser();
+
+    // Prevent duplicate submission using the locally loaded attempts.
+    var duplicateAttempt = (state.data.quizAttempts || []).some(function(attempt){
+      return attempt && attempt.userId === state.currentUserId && attempt.quizId === qs.quiz.id;
+    });
+    if(duplicateAttempt){
+      qs.done = true;
+      state.quizSession = null;
+      notify('You have already completed this quiz.','error');
+      render();
+      return;
+    }
+
     var score = 0;
     var answers = qs.questions.map(function(q, i){
       var selIndex = qs.selections[i];
@@ -2719,7 +2768,9 @@ table.data-table tr:last-child td{border-bottom:none;}
     qs.attemptId = attempt.id;
     qs.finalScore = score;
     qs.done = true;
-    saveData();
+    await saveData();
+    state.quizSession = null;
+    state.tab = 'history';
     render();
   }
 
