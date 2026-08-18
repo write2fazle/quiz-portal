@@ -558,28 +558,12 @@ table.data-table tr:last-child td{border-bottom:none;}
     // Current Supabase schema: public.users(id text, data jsonb, created_at, updated_at).
     // Preserve the complete user object inside data so email/password/role/team
     // and mustChangePassword are never lost.
-    // IMPORTANT: also delete database users that are no longer present in the
-    // current portal state. The previous version only UPSERTed users, so a
-    // deleted account remained in Supabase and came back after reload.
-    items = items || [];
-    var rows = items.map(function(u){
+    var rows = (items || []).map(function(u){
       var id = u.id || uid();
       var copy = clone(u);
       copy.id = id;
       return {id:id, data:JSON.stringify(copy), updated_at:new Date().toISOString()};
     });
-
-    var currentRows = await supaRequest(supaUrl('users', '?select=id'));
-    var keepIds = {};
-    rows.forEach(function(r){ keepIds[String(r.id)] = true; });
-
-    // Remove accounts deleted from the portal.
-    // Wait for all deletion requests to complete before upserting remaining users.
-    var deleteJobs = (currentRows || []).filter(function(row){ return !keepIds[String(row.id)]; }).map(function(row){
-      return supaRequest(supaUrl('users', '?id=eq.' + encodeURIComponent(row.id)), {method:'DELETE'});
-    });
-    if(deleteJobs.length) await Promise.all(deleteJobs);
-
     if(rows.length){
       await supaRequest(supaUrl('users') + '?on_conflict=id', {
         method:'POST',
@@ -807,17 +791,31 @@ table.data-table tr:last-child td{border-bottom:none;}
     return '<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;background:'+bg+';color:'+color+';">'+escapeHtml(action)+'</span>';
   }
 
+  function auditQuestionSnapshot(r){
+    var snap = r && (r.after_data || r.before_data) ? (r.after_data || r.before_data) : null;
+    if(!snap) return {question:'', team:'', correct:'', options:[]};
+    var opts = Array.isArray(snap.options) ? snap.options : [];
+    var ci = Number.isInteger(snap.correctIndex) ? snap.correctIndex : parseInt(snap.correctIndex,10);
+    return {
+      question: snap.question || '',
+      team: snap.team || '',
+      correct: (ci >= 0 && opts[ci] !== undefined) ? opts[ci] : '',
+      options: opts
+    };
+  }
+
   function renderAuditLogAdmin(){
     var wrap=document.createElement('div');
     var card=document.createElement('div'); card.className='card';
     card.innerHTML='<div class="section-title">Audit Log</div>'+
-      '<div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;line-height:1.6;">Track who created, updated or deleted Question Bank records. Showing the latest 500 events.</div>';
+      '<div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;line-height:1.6;">Track who created, updated or deleted Question Bank records. Each event shows the affected question and a snapshot of the data at that time.</div>';
     var toolbar=document.createElement('div'); toolbar.className='filter-row';
     var moduleSel=document.createElement('select'); moduleSel.innerHTML='<option value="">All modules</option><option value="Question Bank">Question Bank</option>';
     var userInput=document.createElement('input'); userInput.type='text'; userInput.placeholder='Filter by user email';
+    var questionInput=document.createElement('input'); questionInput.type='text'; questionInput.placeholder='Search question text';
     var refreshBtn=document.createElement('button'); refreshBtn.className='btn primary small'; refreshBtn.textContent='Load Audit Log';
     var exportBtn=document.createElement('button'); exportBtn.className='btn secondary small'; exportBtn.textContent='Export CSV'; exportBtn.disabled=true;
-    toolbar.appendChild(moduleSel); toolbar.appendChild(userInput); toolbar.appendChild(refreshBtn); toolbar.appendChild(exportBtn); card.appendChild(toolbar);
+    toolbar.appendChild(moduleSel); toolbar.appendChild(userInput); toolbar.appendChild(questionInput); toolbar.appendChild(refreshBtn); toolbar.appendChild(exportBtn); card.appendChild(toolbar);
     var result=document.createElement('div'); result.innerHTML='<div class="empty-note">Click Load Audit Log to view activity.</div>'; card.appendChild(result);
     wrap.appendChild(card);
     var latestRows=[];
@@ -825,13 +823,31 @@ table.data-table tr:last-child td{border-bottom:none;}
       result.innerHTML='<div class="empty-note">Loading audit log...</div>';
       try{
         latestRows=await readAuditLogs({module:moduleSel.value,userEmail:userInput.value.trim()});
+        var search=(questionInput.value||'').trim().toLowerCase();
+        if(search){
+          latestRows=latestRows.filter(function(r){
+            var s=auditQuestionSnapshot(r);
+            return (s.question||'').toLowerCase().indexOf(search)!==-1 || (s.team||'').toLowerCase().indexOf(search)!==-1;
+          });
+        }
         exportBtn.disabled=!latestRows.length;
         if(!latestRows.length){ result.innerHTML='<div class="empty-note">No audit activity found.</div>'; return; }
         var table=document.createElement('table'); table.className='data-table';
-        table.innerHTML='<tr><th>Action</th><th>Module</th><th>Record ID</th><th>User</th><th>Email</th><th>Date / Time</th><th>Details</th></tr>';
+        table.innerHTML='<tr><th>Action</th><th>Question</th><th>Team</th><th>Record ID</th><th>User</th><th>Date / Time</th><th>Details</th><th></th></tr>';
         latestRows.forEach(function(r){
+          var snap=auditQuestionSnapshot(r);
           var tr=document.createElement('tr');
-          tr.innerHTML='<td>'+auditActionBadge(r.action)+'</td><td>'+escapeHtml(r.module)+'</td><td style="font-family:JetBrains Mono,monospace;font-size:11px;">'+escapeHtml(r.record_id||'')+'</td><td>'+escapeHtml(r.user_name||'')+'</td><td>'+escapeHtml(r.user_email||'')+'</td><td>'+escapeHtml(fmtDateTime(r.created_at))+'</td><td>'+escapeHtml(r.details||'')+'</td>';
+          var qText=snap.question || 'Question data unavailable';
+          var safePreview=qText.length>180 ? qText.slice(0,180)+'…' : qText;
+          tr.innerHTML='<td>'+auditActionBadge(r.action)+'</td>'+
+            '<td style="min-width:280px;max-width:460px;"><div style="font-weight:600;line-height:1.45;">'+escapeHtml(safePreview)+'</div><div style="font-size:10px;color:var(--text-mute);margin-top:4px;">'+escapeHtml(snap.correct?'Correct: '+snap.correct:'')+'</div></td>'+
+            '<td>'+escapeHtml(snap.team||'—')+'</td>'+
+            '<td style="font-family:JetBrains Mono,monospace;font-size:11px;">'+escapeHtml(r.record_id||'')+'</td>'+
+            '<td><div>'+escapeHtml(r.user_name||'')+'</div><div style="font-size:10px;color:var(--text-mute);">'+escapeHtml(r.user_email||'')+'</div></td>'+
+            '<td>'+escapeHtml(fmtDateTime(r.created_at))+'</td>'+
+            '<td>'+escapeHtml(r.details||'')+'</td>'+
+            '<td><button class="btn secondary small audit-view-event">View</button></td>';
+          tr.querySelector('.audit-view-event').onclick=function(){ showAuditEventModal(r); };
           table.appendChild(tr);
         });
         result.innerHTML=''; result.appendChild(table);
@@ -839,9 +855,32 @@ table.data-table tr:last-child td{border-bottom:none;}
     }
     refreshBtn.onclick=load;
     exportBtn.onclick=function(){
-      downloadCSV('question-bank-audit-log.csv',['Action','Module','Record ID','User ID','User Name','User Email','User Role','Details','Created At'],latestRows.map(function(r){return [r.action,r.module,r.record_id,r.user_id,r.user_name,r.user_email,r.user_role,r.details,r.created_at];}));
+      downloadCSV('question-bank-audit-log.csv',['Action','Question','Team','Correct Answer','Record ID','User ID','User Name','User Email','User Role','Details','Created At'],latestRows.map(function(r){var x=auditQuestionSnapshot(r);return [r.action,x.question,x.team,x.correct,r.record_id,r.user_id,r.user_name,r.user_email,r.user_role,r.details,r.created_at];}));
     };
     return wrap;
+  }
+
+  function showAuditEventModal(r){
+    var overlay=document.createElement('div'); overlay.className='modal-overlay';
+    var box=document.createElement('div'); box.className='modal-box wide';
+    var before=r.before_data||null, after=r.after_data||null;
+    var snap=(r.action==='UPDATE' && after) ? after : (after||before);
+    var x=auditQuestionSnapshot(r);
+    var beforeX=before ? auditQuestionSnapshot({before_data:before}) : null;
+    var afterX=after ? auditQuestionSnapshot({after_data:after}) : null;
+    box.innerHTML='<div class="modal-head"><div><h3 class="modal-title">Audit Event Details</h3><div style="font-size:11px;color:var(--text-dim);margin-top:4px;">'+auditActionBadge(r.action)+' &nbsp; Record ID: '+escapeHtml(r.record_id||'')+'</div></div><button class="modal-close">&times;</button></div><div id="auditEventBody"></div>';
+    box.querySelector('.modal-close').onclick=function(){overlay.remove();};
+    var body=box.querySelector('#auditEventBody');
+    var html='<div style="background:var(--surface-2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;line-height:1.8;">'+
+      '<b>Action:</b> '+escapeHtml(r.action||'')+'<br><b>User:</b> '+escapeHtml(r.user_name||'')+' ('+escapeHtml(r.user_email||'')+')<br><b>Date / Time:</b> '+escapeHtml(fmtDateTime(r.created_at))+'<br><b>Team:</b> '+escapeHtml(x.team||'—')+'<br><b>Question:</b> '+escapeHtml(x.question||'Question data unavailable')+'</div>';
+    if(r.action==='UPDATE' && beforeX && afterX){
+      html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'+
+        '<div style="border:1px solid var(--border);border-radius:8px;padding:12px;"><div class="section-title" style="font-size:13px;">BEFORE</div><div style="font-size:12px;line-height:1.7;"><b>Question:</b><br>'+escapeHtml(beforeX.question)+'<br><br><b>Team:</b> '+escapeHtml(beforeX.team)+'<br><b>Correct:</b> '+escapeHtml(beforeX.correct||'—')+'</div></div>'+ 
+        '<div style="border:1px solid var(--border);border-radius:8px;padding:12px;"><div class="section-title" style="font-size:13px;">AFTER</div><div style="font-size:12px;line-height:1.7;"><b>Question:</b><br>'+escapeHtml(afterX.question)+'<br><br><b>Team:</b> '+escapeHtml(afterX.team)+'<br><b>Correct:</b> '+escapeHtml(afterX.correct||'—')+'</div></div></div>';
+    }else{
+      html+='<div style="border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;line-height:1.7;"><b>Question Snapshot</b><br><br><b>Question:</b><br>'+escapeHtml(x.question||'Question data unavailable')+'<br><br><b>Team:</b> '+escapeHtml(x.team||'—')+'<br><b>Correct Answer:</b> '+escapeHtml(x.correct||'—')+'</div>';
+    }
+    body.innerHTML=html; overlay.appendChild(box); document.body.appendChild(overlay);
   }
 
   function renderQuestionAuditModal(questionId){
@@ -855,18 +894,23 @@ table.data-table tr:last-child td{border-bottom:none;}
       try{
         var rows=await readAuditLogs({module:'Question Bank',recordId:questionId});
         var body=box.querySelector('#questionAuditBody');
+        var latest=q ? {question:q.question,team:q.team,correct:(q.options&&q.options[q.correctIndex])||''} : null;
         var meta='';
         if(q){
           var c=q.createdBy||{name:'Legacy / Unknown',email:''};
-          meta='<div style="background:var(--surface-2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;line-height:1.8;">'+
-            '<b>Created By:</b> '+escapeHtml(c.name||'Legacy / Unknown')+' '+(c.email?'('+escapeHtml(c.email)+')':'')+'<br>'+
-            '<b>Created At:</b> '+escapeHtml(q.createdAt?fmtDateTime(q.createdAt):'Unknown')+'<br>'+
-            '<b>Last Updated By:</b> '+escapeHtml(q.updatedBy ? q.updatedBy.name : '—')+' '+(q.updatedBy&&q.updatedBy.email?'('+escapeHtml(q.updatedBy.email)+')':'')+'<br>'+
-            '<b>Last Updated At:</b> '+escapeHtml(q.updatedAt?fmtDateTime(q.updatedAt):'—')+'</div>';
+          meta='<div style="background:var(--surface-2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;line-height:1.8;"><b>Current Question:</b> '+escapeHtml(q.question)+'<br><b>Team:</b> '+escapeHtml(q.team||'—')+'<br><b>Created By:</b> '+escapeHtml(c.name||'Legacy / Unknown')+' '+(c.email?'('+escapeHtml(c.email)+')':'')+'<br><b>Created At:</b> '+escapeHtml(q.createdAt?fmtDateTime(q.createdAt):'Unknown')+'<br><b>Last Updated By:</b> '+escapeHtml(q.updatedBy ? q.updatedBy.name : '—')+' '+(q.updatedBy&&q.updatedBy.email?'('+escapeHtml(q.updatedBy.email)+')':'')+'<br><b>Last Updated At:</b> '+escapeHtml(q.updatedAt?fmtDateTime(q.updatedAt):'—')+'</div>';
+        }else{
+          meta='<div style="background:var(--surface-2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;line-height:1.8;"><b>Status:</b> This question is no longer in the Question Bank. The audit snapshot is preserved.</div>';
         }
         if(!rows.length){ body.innerHTML=meta+'<div class="empty-note">No audit events found for this question.</div>'; return; }
-        var table=document.createElement('table'); table.className='data-table'; table.innerHTML='<tr><th>Action</th><th>User</th><th>Email</th><th>Date / Time</th><th>Details</th></tr>';
-        rows.forEach(function(r){ var tr=document.createElement('tr'); tr.innerHTML='<td>'+auditActionBadge(r.action)+'</td><td>'+escapeHtml(r.user_name||'')+'</td><td>'+escapeHtml(r.user_email||'')+'</td><td>'+escapeHtml(fmtDateTime(r.created_at))+'</td><td>'+escapeHtml(r.details||'')+'</td>'; table.appendChild(tr); });
+        var table=document.createElement('table'); table.className='data-table'; table.innerHTML='<tr><th>Action</th><th>Question</th><th>Team</th><th>User</th><th>Date / Time</th><th>Details</th><th></th></tr>';
+        rows.forEach(function(r){
+          var x=auditQuestionSnapshot(r); var tr=document.createElement('tr');
+          var preview=(x.question||'Question data unavailable'); if(preview.length>120) preview=preview.slice(0,120)+'…';
+          tr.innerHTML='<td>'+auditActionBadge(r.action)+'</td><td style="max-width:360px;line-height:1.45;">'+escapeHtml(preview)+'</td><td>'+escapeHtml(x.team||'—')+'</td><td><div>'+escapeHtml(r.user_name||'')+'</div><div style="font-size:10px;color:var(--text-mute);">'+escapeHtml(r.user_email||'')+'</div></td><td>'+escapeHtml(fmtDateTime(r.created_at))+'</td><td>'+escapeHtml(r.details||'')+'</td><td><button class="btn secondary small audit-view-event">View</button></td>';
+          tr.querySelector('.audit-view-event').onclick=function(){ showAuditEventModal(r); };
+          table.appendChild(tr);
+        });
         body.innerHTML=meta; body.appendChild(table);
       }catch(e){ box.querySelector('#questionAuditBody').innerHTML='<div class="empty-note" style="color:var(--red);">Could not load audit history: '+escapeHtml(e.message||e)+'</div>'; }
     },0);
