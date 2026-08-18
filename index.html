@@ -8,15 +8,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root{
-  --navy:#1B2A4A;
-  --navy-dim:#2B3E63;
+  --navy:#FFFFFF;
+  --navy-dim:#FFFFFF;
   --orange:#F46B12;
   --orange-dim:#F79A5C;
   --orange-dark:#C6540C;
-  --bg:#F5F6F8;
+  --bg:#F8FAFC;
   --surface:#FFFFFF;
-  --surface-2:#F0F2F5;
-  --line:#E3E6EB;
+  --surface-2:#F8FAFC;
+  --line:#E4E7EC;
   --text:#1F2430;
   --text-dim:#6B7280;
   --text-mute:#9CA3AF;
@@ -33,18 +33,61 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 button,select,input,textarea{font-family:'Inter',sans-serif;}
 button{cursor:pointer;}
 
-.shell{width:100%;max-width:1160px;margin:0 auto;padding:20px 20px 60px;}
+.shell{width:100%;max-width:none;margin:0;padding:0 28px 60px;transition:padding-left .25s ease;}
+
+/* ---- fixed sidebar / fluid workspace ---- */
+.app-layout{min-height:100vh;width:100%;}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:258px;background:#FFFFFF;color:#344054;border-right:1px solid rgba(255,255,255,.07);z-index:200;display:flex;flex-direction:column;transition:width .25s ease,transform .25s ease;box-shadow:10px 0 30px rgba(0,0,0,.10);}
+.sidebar.collapsed{width:76px;}
+.sidebar-brand{height:72px;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid rgba(255,255,255,.07);flex:none;}
+.sidebar-brand-mark{width:36px;height:36px;border-radius:10px;background:var(--orange);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;box-shadow:0 5px 18px rgba(244,107,18,.25);flex:none;}
+.sidebar-brand-text{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;}
+.sidebar.collapsed .sidebar-brand{justify-content:center;padding:0 10px;}
+.sidebar.collapsed .sidebar-brand-text{display:none;}
+.sidebar-nav{padding:16px 12px;overflow-y:auto;flex:1;}
+.sidebar-section-label{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:#6B7280;padding:4px 10px 9px;}
+.sidebar-item{width:100%;display:flex;align-items:center;gap:12px;border:0;background:transparent;color:#9CA3AF;border-radius:9px;padding:10px 11px;margin-bottom:3px;font-size:13px;font-weight:500;text-align:left;transition:background .18s ease,color .18s ease,transform .18s ease;position:relative;}
+.sidebar-item:hover{background:#F8FAFC;color:#F9FAFB;}
+.sidebar-item.active{background:rgba(244,107,18,.14);color:#FDBA74;font-weight:600;}
+.sidebar-item.active:before{content:'';position:absolute;left:-12px;top:8px;bottom:8px;width:3px;border-radius:0 4px 4px 0;background:var(--orange);}
+.sidebar-icon{width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;flex:none;font-size:16px;}
+.sidebar-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sidebar-badge{margin-left:auto;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#DC2626;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;}
+.sidebar.collapsed .sidebar-section-label,.sidebar.collapsed .sidebar-label,.sidebar.collapsed .sidebar-badge{display:none;}
+.sidebar.collapsed .sidebar-item{justify-content:center;padding:10px 8px;}
+.sidebar.collapsed .sidebar-item.active:before{left:0;}
+.sidebar-footer{padding:12px;border-top:1px solid rgba(255,255,255,.07);flex:none;}
+.sidebar-user{display:flex;align-items:center;gap:10px;padding:8px;border-radius:9px;background:rgba(255,255,255,.04);margin-bottom:8px;overflow:hidden;}
+.sidebar-user-info{min-width:0;flex:1;}
+.sidebar-user-name{font-size:12px;font-weight:600;color:#F3F4F6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sidebar-user-role{font-size:10px;color:#6B7280;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sidebar.collapsed .sidebar-user{justify-content:center;padding:7px 3px;}
+.sidebar.collapsed .sidebar-user-info{display:none;}
+.sidebar-toggle{width:100%;height:36px;border:1px solid rgba(255,255,255,.08);background:#F8FAFC;color:#9CA3AF;border-radius:8px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;}
+.sidebar-toggle:hover{background:#273449;color:#fff;}
+.sidebar.collapsed .sidebar-toggle span{display:none;}
+.workspace{margin-left:258px;min-height:100vh;width:calc(100% - 258px);transition:margin-left .25s ease,width .25s ease;}
+.workspace.collapsed{margin-left:76px;width:calc(100% - 76px);}
+.mobile-sidebar-overlay{display:none;}
 
 /* ---- top bar ---- */
-.topbar{display:flex;align-items:center;gap:16px;background:var(--navy);color:#fff;border-radius:12px;padding:14px 20px;margin-bottom:20px;}
+.topbar{display:flex;align-items:center;gap:12px;background:var(--navy);color:#fff;border-radius:0;padding:14px 22px;margin:0 0 20px;min-height:64px;position:sticky;top:0;z-index:100;}
+.topbar-page-title{font-size:14px;font-weight:600;color:#1F2430;}
+.topbar-toggle{width:36px;height:36px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:#1F2430;display:inline-flex;align-items:center;justify-content:center;font-size:18px;}
+.topbar-toggle:hover{background:rgba(255,255,255,.16);}
 .brand{font-weight:700;font-size:17px;display:flex;align-items:center;gap:10px;}
 .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--orange);}
-.top-user{display:flex;align-items:center;gap:12px;margin-left:auto;font-size:13px;}
-.avatar{width:30px;height:30px;border-radius:50%;background:var(--orange);color:#fff;font-weight:600;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden;}
-.avatar img{width:100%;height:100%;object-fit:cover;}
-.role-pill{font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,0.15);margin-left:6px;}
-.logout-btn{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);color:#fff;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;}
+.top-user{display:flex;align-items:center;justify-content:flex-end;gap:16px;margin-left:auto;min-width:0;font-size:13px;white-space:nowrap;}
+.avatar{width:34px;height:34px;border-radius:50%;background:var(--orange);color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;flex:0 0 34px;overflow:hidden;}
+.avatar img{width:100%;height:100%;object-fit:cover;display:block;}
+.role-pill{display:inline-flex;align-items:center;justify-content:center;font-size:10px;line-height:1;padding:4px 9px;border-radius:999px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.12);margin:0;}
+.logout-btn{display:inline-flex;align-items:center;justify-content:center;height:34px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);color:#fff;border-radius:7px;padding:0 13px;font-size:12px;font-weight:600;white-space:nowrap;flex:0 0 auto;}
 .logout-btn:hover{background:rgba(255,255,255,0.25);}
+.top-user-identity{display:flex;align-items:center;gap:9px;min-width:0;white-space:nowrap;}
+.top-user-name{font-weight:600;color:#fff;line-height:1.2;white-space:nowrap;}
+.top-user .role-pill{margin-left:0;}
+@media (max-width:700px){.topbar{padding:12px 14px;gap:9px;}.topbar-page-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.top-user{gap:8px;}.top-user-name{display:none;}.role-pill{font-size:9px;padding:4px 7px;}.logout-btn{padding:0 10px;}.avatar{width:32px;height:32px;flex-basis:32px;}}
+.sidebar-footer{margin-top:auto;}
 
 /* ---- login ---- */
 .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
@@ -196,6 +239,16 @@ table.data-table tr:last-child td{border-bottom:none;}
 .admin-menu-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;}
 .filter-row .form-row{margin-bottom:0;flex:1;min-width:160px;}
 
+@media(max-width:900px){
+  .sidebar{transform:translateX(-100%);width:258px;}
+  .sidebar.mobile-open{transform:translateX(0);}
+  .workspace,.workspace.collapsed{margin-left:0;width:100%;}
+  .shell{padding:0 16px 50px;}
+  .mobile-sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:150;display:none;}
+  .mobile-sidebar-overlay.open{display:block;}
+  .topbar{position:sticky;top:0;}
+}
+
 /* ---- modal ---- */
 .modal-overlay{position:fixed;inset:0;background:rgba(20,25,40,0.5);display:flex;align-items:center;justify-content:center;padding:20px;z-index:100;}
 .modal-box{background:var(--surface);border-radius:12px;max-width:640px;width:100%;max-height:88vh;overflow-y:auto;padding:22px 24px;}
@@ -208,6 +261,34 @@ table.data-table tr:last-child td{border-bottom:none;}
 @media(max-width:640px){
   .stat-grid{grid-template-columns:1fr 1fr;}
 }
+
+/* LIGHT PREMIUM SIDEBAR OVERRIDES */
+.sidebar{background:#FFFFFF!important;color:#344054!important;border-right:1px solid #E4E7EC!important;box-shadow:2px 0 12px rgba(16,24,40,.04)!important;}
+.sidebar .nav-item,.sidebar button{color:#475467;}
+.sidebar .nav-item:hover,.sidebar button:hover{background:#F9FAFB!important;color:#F46B12!important;}
+.sidebar .nav-item.active,.sidebar .nav-item.active:hover{background:#FFF1E8!important;color:#F46B12!important;}
+.sidebar .nav-item.active svg,.sidebar .nav-item:hover svg{color:#F46B12!important;}
+.sidebar .brand,.sidebar .brand-title{color:#1D2939!important;}
+.sidebar .muted,.sidebar .user-meta{color:#667085!important;}
+.sidebar .collapse-btn{background:#FFFFFF!important;border:1px solid #E4E7EC!important;color:#667085!important;}
+.sidebar .collapse-btn:hover{background:#FFF7F2!important;color:#F46B12!important;border-color:#F46B12!important;}
+@media(max-width:768px){.sidebar{box-shadow:8px 0 24px rgba(16,24,40,.12)!important;}}
+
+/* Minimalist flat vector sidebar icons */
+.sidebar-icon{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;flex:0 0 22px;line-height:1}
+.sidebar-svg-icon{width:20px;height:20px;display:block;stroke:currentColor;fill:none;vector-effect:non-scaling-stroke}
+.sidebar-item.active .sidebar-svg-icon{stroke:currentColor}
+.sidebar-item:hover .sidebar-svg-icon{stroke:currentColor}
+</style>
+
+<style id="topbar-profile-readable-fix">
+/* Top-right profile: high-contrast text on the navy top bar */
+.top-user { color: #667085 !important; }
+.top-user-name { color: #667085 !important; font-weight: 600 !important; }
+.top-user .role-pill { color: #667085 !important; background: rgba(102,112,133,.08) !important; border-color: rgba(102,112,133,.20) !important; }
+.logout-btn, .top-user .logout-btn { color: #667085 !important; background: rgba(102,112,133,.06) !important; border-color: rgba(102,112,133,.20) !important; }
+.logout-btn:hover, .top-user .logout-btn:hover { color: #475467 !important; background: rgba(102,112,133,.12) !important; border-color: rgba(102,112,133,.30) !important; }
+.avatar { color: #667085 !important; }
 </style>
 </head>
 <body>
@@ -379,7 +460,8 @@ table.data-table tr:last-child td{border-bottom:none;}
     kuGateIndex: 0,
     viewingKuId: null,
     viewingQuestionAuditId: null,
-    adminMenuOpen: false
+    adminMenuOpen: false,
+    sidebarCollapsed: localStorage.getItem('quiz_sidebar_collapsed') === '1'
   };
 
   var SESSION_KEY = 'quiz-portal-session-v1';
@@ -791,31 +873,51 @@ table.data-table tr:last-child td{border-bottom:none;}
     return '<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;background:'+bg+';color:'+color+';">'+escapeHtml(action)+'</span>';
   }
 
-  function auditQuestionSnapshot(r){
-    var snap = r && (r.after_data || r.before_data) ? (r.after_data || r.before_data) : null;
-    if(!snap) return {question:'', team:'', correct:'', options:[]};
-    var opts = Array.isArray(snap.options) ? snap.options : [];
-    var ci = Number.isInteger(snap.correctIndex) ? snap.correctIndex : parseInt(snap.correctIndex,10);
-    return {
-      question: snap.question || '',
-      team: snap.team || '',
-      correct: (ci >= 0 && opts[ci] !== undefined) ? opts[ci] : '',
-      options: opts
-    };
+  function auditSnapshotValue(data, key){
+    if(!data) return '';
+    if(typeof data === 'string'){
+      try{ data = JSON.parse(data); }catch(e){ return ''; }
+    }
+    return data && data[key] != null ? data[key] : '';
+  }
+
+  function auditSnapshotQuestion(data){
+    if(!data) return '';
+    if(typeof data === 'string'){
+      try{ data = JSON.parse(data); }catch(e){ return ''; }
+    }
+    return data.question || data.title || '';
+  }
+
+  function auditSnapshotTeam(data){
+    if(!data) return '';
+    if(typeof data === 'string'){
+      try{ data = JSON.parse(data); }catch(e){ return ''; }
+    }
+    return data.team || '';
+  }
+
+  function auditSnapshotAnswer(data){
+    if(!data) return '';
+    if(typeof data === 'string'){
+      try{ data = JSON.parse(data); }catch(e){ return ''; }
+    }
+    if(data.correctIndex != null && Array.isArray(data.options)) return data.options[data.correctIndex] || '';
+    if(data.correctAnswer != null) return data.correctAnswer;
+    return '';
   }
 
   function renderAuditLogAdmin(){
     var wrap=document.createElement('div');
     var card=document.createElement('div'); card.className='card';
     card.innerHTML='<div class="section-title">Audit Log</div>'+
-      '<div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;line-height:1.6;">Track who created, updated or deleted Question Bank records. Each event shows the affected question and a snapshot of the data at that time.</div>';
+      '<div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;line-height:1.6;">Track who created, updated or deleted Question Bank records. Showing the latest 500 events.</div>';
     var toolbar=document.createElement('div'); toolbar.className='filter-row';
     var moduleSel=document.createElement('select'); moduleSel.innerHTML='<option value="">All modules</option><option value="Question Bank">Question Bank</option>';
     var userInput=document.createElement('input'); userInput.type='text'; userInput.placeholder='Filter by user email';
-    var questionInput=document.createElement('input'); questionInput.type='text'; questionInput.placeholder='Search question text';
     var refreshBtn=document.createElement('button'); refreshBtn.className='btn primary small'; refreshBtn.textContent='Load Audit Log';
     var exportBtn=document.createElement('button'); exportBtn.className='btn secondary small'; exportBtn.textContent='Export CSV'; exportBtn.disabled=true;
-    toolbar.appendChild(moduleSel); toolbar.appendChild(userInput); toolbar.appendChild(questionInput); toolbar.appendChild(refreshBtn); toolbar.appendChild(exportBtn); card.appendChild(toolbar);
+    toolbar.appendChild(moduleSel); toolbar.appendChild(userInput); toolbar.appendChild(refreshBtn); toolbar.appendChild(exportBtn); card.appendChild(toolbar);
     var result=document.createElement('div'); result.innerHTML='<div class="empty-note">Click Load Audit Log to view activity.</div>'; card.appendChild(result);
     wrap.appendChild(card);
     var latestRows=[];
@@ -823,64 +925,30 @@ table.data-table tr:last-child td{border-bottom:none;}
       result.innerHTML='<div class="empty-note">Loading audit log...</div>';
       try{
         latestRows=await readAuditLogs({module:moduleSel.value,userEmail:userInput.value.trim()});
-        var search=(questionInput.value||'').trim().toLowerCase();
-        if(search){
-          latestRows=latestRows.filter(function(r){
-            var s=auditQuestionSnapshot(r);
-            return (s.question||'').toLowerCase().indexOf(search)!==-1 || (s.team||'').toLowerCase().indexOf(search)!==-1;
-          });
-        }
         exportBtn.disabled=!latestRows.length;
         if(!latestRows.length){ result.innerHTML='<div class="empty-note">No audit activity found.</div>'; return; }
         var table=document.createElement('table'); table.className='data-table';
-        table.innerHTML='<tr><th>Action</th><th>Question</th><th>Team</th><th>Record ID</th><th>User</th><th>Date / Time</th><th>Details</th><th></th></tr>';
+        table.innerHTML='<tr><th>Action</th><th>Question</th><th>Team</th><th>Record ID</th><th>User</th><th>Email</th><th>Date / Time</th><th>Details</th><th>View</th></tr>';
         latestRows.forEach(function(r){
-          var snap=auditQuestionSnapshot(r);
+          var snap = r.after_data || r.before_data || null;
           var tr=document.createElement('tr');
-          var qText=snap.question || 'Question data unavailable';
-          var safePreview=qText.length>180 ? qText.slice(0,180)+'…' : qText;
-          tr.innerHTML='<td>'+auditActionBadge(r.action)+'</td>'+
-            '<td style="min-width:280px;max-width:460px;"><div style="font-weight:600;line-height:1.45;">'+escapeHtml(safePreview)+'</div><div style="font-size:10px;color:var(--text-mute);margin-top:4px;">'+escapeHtml(snap.correct?'Correct: '+snap.correct:'')+'</div></td>'+
-            '<td>'+escapeHtml(snap.team||'—')+'</td>'+
-            '<td style="font-family:JetBrains Mono,monospace;font-size:11px;">'+escapeHtml(r.record_id||'')+'</td>'+
-            '<td><div>'+escapeHtml(r.user_name||'')+'</div><div style="font-size:10px;color:var(--text-mute);">'+escapeHtml(r.user_email||'')+'</div></td>'+
-            '<td>'+escapeHtml(fmtDateTime(r.created_at))+'</td>'+
-            '<td>'+escapeHtml(r.details||'')+'</td>'+
-            '<td><button class="btn secondary small audit-view-event">View</button></td>';
-          tr.querySelector('.audit-view-event').onclick=function(){ showAuditEventModal(r); };
-          table.appendChild(tr);
+          var view = document.createElement('button'); view.className='btn secondary small'; view.textContent='View';
+          view.onclick=function(){ state.viewingQuestionAuditId=r.record_id; state.viewingAuditRows=r; render(); };
+          var qText=auditSnapshotQuestion(snap), team=auditSnapshotTeam(snap);
+          tr.innerHTML='<td>'+auditActionBadge(r.action)+'</td><td style="max-width:280px;white-space:normal;line-height:1.45;">'+escapeHtml(qText||'—')+'</td><td>'+escapeHtml(team||'—')+'</td><td style="font-family:JetBrains Mono,monospace;font-size:11px;">'+escapeHtml(r.record_id||'')+'</td><td>'+escapeHtml(r.user_name||'')+'</td><td>'+escapeHtml(r.user_email||'')+'</td><td>'+escapeHtml(fmtDateTime(r.created_at))+'</td><td>'+escapeHtml(r.details||'')+'</td><td class="audit-view-cell"></td>';
+          tr.querySelector('.audit-view-cell').appendChild(view); table.appendChild(tr);
         });
         result.innerHTML=''; result.appendChild(table);
       }catch(e){ result.innerHTML='<div class="empty-note" style="color:var(--red);">Could not load audit log: '+escapeHtml(e.message||e)+'</div>'; }
     }
     refreshBtn.onclick=load;
     exportBtn.onclick=function(){
-      downloadCSV('question-bank-audit-log.csv',['Action','Question','Team','Correct Answer','Record ID','User ID','User Name','User Email','User Role','Details','Created At'],latestRows.map(function(r){var x=auditQuestionSnapshot(r);return [r.action,x.question,x.team,x.correct,r.record_id,r.user_id,r.user_name,r.user_email,r.user_role,r.details,r.created_at];}));
+      downloadCSV('question-bank-audit-log.csv',['Action','Question','Team','Correct Answer','Record ID','User ID','User Name','User Email','User Role','Details','Created At'],latestRows.map(function(r){
+        var snap=r.after_data||r.before_data||null;
+        return [r.action,auditSnapshotQuestion(snap),auditSnapshotTeam(snap),auditSnapshotAnswer(snap),r.record_id,r.user_id,r.user_name,r.user_email,r.user_role,r.details,r.created_at];
+      }));
     };
     return wrap;
-  }
-
-  function showAuditEventModal(r){
-    var overlay=document.createElement('div'); overlay.className='modal-overlay';
-    var box=document.createElement('div'); box.className='modal-box wide';
-    var before=r.before_data||null, after=r.after_data||null;
-    var snap=(r.action==='UPDATE' && after) ? after : (after||before);
-    var x=auditQuestionSnapshot(r);
-    var beforeX=before ? auditQuestionSnapshot({before_data:before}) : null;
-    var afterX=after ? auditQuestionSnapshot({after_data:after}) : null;
-    box.innerHTML='<div class="modal-head"><div><h3 class="modal-title">Audit Event Details</h3><div style="font-size:11px;color:var(--text-dim);margin-top:4px;">'+auditActionBadge(r.action)+' &nbsp; Record ID: '+escapeHtml(r.record_id||'')+'</div></div><button class="modal-close">&times;</button></div><div id="auditEventBody"></div>';
-    box.querySelector('.modal-close').onclick=function(){overlay.remove();};
-    var body=box.querySelector('#auditEventBody');
-    var html='<div style="background:var(--surface-2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;line-height:1.8;">'+
-      '<b>Action:</b> '+escapeHtml(r.action||'')+'<br><b>User:</b> '+escapeHtml(r.user_name||'')+' ('+escapeHtml(r.user_email||'')+')<br><b>Date / Time:</b> '+escapeHtml(fmtDateTime(r.created_at))+'<br><b>Team:</b> '+escapeHtml(x.team||'—')+'<br><b>Question:</b> '+escapeHtml(x.question||'Question data unavailable')+'</div>';
-    if(r.action==='UPDATE' && beforeX && afterX){
-      html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'+
-        '<div style="border:1px solid var(--border);border-radius:8px;padding:12px;"><div class="section-title" style="font-size:13px;">BEFORE</div><div style="font-size:12px;line-height:1.7;"><b>Question:</b><br>'+escapeHtml(beforeX.question)+'<br><br><b>Team:</b> '+escapeHtml(beforeX.team)+'<br><b>Correct:</b> '+escapeHtml(beforeX.correct||'—')+'</div></div>'+ 
-        '<div style="border:1px solid var(--border);border-radius:8px;padding:12px;"><div class="section-title" style="font-size:13px;">AFTER</div><div style="font-size:12px;line-height:1.7;"><b>Question:</b><br>'+escapeHtml(afterX.question)+'<br><br><b>Team:</b> '+escapeHtml(afterX.team)+'<br><b>Correct:</b> '+escapeHtml(afterX.correct||'—')+'</div></div></div>';
-    }else{
-      html+='<div style="border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;line-height:1.7;"><b>Question Snapshot</b><br><br><b>Question:</b><br>'+escapeHtml(x.question||'Question data unavailable')+'<br><br><b>Team:</b> '+escapeHtml(x.team||'—')+'<br><b>Correct Answer:</b> '+escapeHtml(x.correct||'—')+'</div>';
-    }
-    body.innerHTML=html; overlay.appendChild(box); document.body.appendChild(overlay);
   }
 
   function renderQuestionAuditModal(questionId){
@@ -888,27 +956,42 @@ table.data-table tr:last-child td{border-bottom:none;}
     var box=document.createElement('div'); box.className='modal-box wide';
     var q=state.data.questionBank.find(function(x){return x.id===questionId;});
     box.innerHTML='<div class="modal-head"><div><h3 class="modal-title">Question Audit History</h3><div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Record ID: '+escapeHtml(questionId)+'</div></div><button class="modal-close">&times;</button></div><div id="questionAuditBody"><div class="empty-note">Loading...</div></div>';
-    box.querySelector('.modal-close').onclick=function(){state.viewingQuestionAuditId=null;render();};
+    box.querySelector('.modal-close').onclick=function(){state.viewingQuestionAuditId=null;state.viewingAuditRows=null;render();};
     overlay.appendChild(box);
     setTimeout(async function(){
       try{
         var rows=await readAuditLogs({module:'Question Bank',recordId:questionId});
         var body=box.querySelector('#questionAuditBody');
-        var latest=q ? {question:q.question,team:q.team,correct:(q.options&&q.options[q.correctIndex])||''} : null;
         var meta='';
         if(q){
           var c=q.createdBy||{name:'Legacy / Unknown',email:''};
-          meta='<div style="background:var(--surface-2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;line-height:1.8;"><b>Current Question:</b> '+escapeHtml(q.question)+'<br><b>Team:</b> '+escapeHtml(q.team||'—')+'<br><b>Created By:</b> '+escapeHtml(c.name||'Legacy / Unknown')+' '+(c.email?'('+escapeHtml(c.email)+')':'')+'<br><b>Created At:</b> '+escapeHtml(q.createdAt?fmtDateTime(q.createdAt):'Unknown')+'<br><b>Last Updated By:</b> '+escapeHtml(q.updatedBy ? q.updatedBy.name : '—')+' '+(q.updatedBy&&q.updatedBy.email?'('+escapeHtml(q.updatedBy.email)+')':'')+'<br><b>Last Updated At:</b> '+escapeHtml(q.updatedAt?fmtDateTime(q.updatedAt):'—')+'</div>';
-        }else{
-          meta='<div style="background:var(--surface-2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;line-height:1.8;"><b>Status:</b> This question is no longer in the Question Bank. The audit snapshot is preserved.</div>';
+          meta='<div style="background:var(--surface-2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;line-height:1.8;">'+
+            '<b>Created By:</b> '+escapeHtml(c.name||'Legacy / Unknown')+' '+(c.email?'('+escapeHtml(c.email)+')':'')+'<br>'+
+            '<b>Created At:</b> '+escapeHtml(q.createdAt?fmtDateTime(q.createdAt):'Unknown')+'<br>'+
+            '<b>Last Updated By:</b> '+escapeHtml(q.updatedBy ? q.updatedBy.name : '—')+' '+(q.updatedBy&&q.updatedBy.email?'('+escapeHtml(q.updatedBy.email)+')':'')+'<br>'+
+            '<b>Last Updated At:</b> '+escapeHtml(q.updatedAt?fmtDateTime(q.updatedAt):'—')+'</div>';
         }
         if(!rows.length){ body.innerHTML=meta+'<div class="empty-note">No audit events found for this question.</div>'; return; }
-        var table=document.createElement('table'); table.className='data-table'; table.innerHTML='<tr><th>Action</th><th>Question</th><th>Team</th><th>User</th><th>Date / Time</th><th>Details</th><th></th></tr>';
+        var table=document.createElement('table'); table.className='data-table'; table.innerHTML='<tr><th>Action</th><th>User</th><th>Email</th><th>Date / Time</th><th>Details</th></tr>';
         rows.forEach(function(r){
-          var x=auditQuestionSnapshot(r); var tr=document.createElement('tr');
-          var preview=(x.question||'Question data unavailable'); if(preview.length>120) preview=preview.slice(0,120)+'…';
-          tr.innerHTML='<td>'+auditActionBadge(r.action)+'</td><td style="max-width:360px;line-height:1.45;">'+escapeHtml(preview)+'</td><td>'+escapeHtml(x.team||'—')+'</td><td><div>'+escapeHtml(r.user_name||'')+'</div><div style="font-size:10px;color:var(--text-mute);">'+escapeHtml(r.user_email||'')+'</div></td><td>'+escapeHtml(fmtDateTime(r.created_at))+'</td><td>'+escapeHtml(r.details||'')+'</td><td><button class="btn secondary small audit-view-event">View</button></td>';
-          tr.querySelector('.audit-view-event').onclick=function(){ showAuditEventModal(r); };
+          var tr=document.createElement('tr');
+          tr.innerHTML='<td>'+auditActionBadge(r.action)+'</td><td>'+escapeHtml(r.user_name||'')+'</td><td>'+escapeHtml(r.user_email||'')+'</td><td>'+escapeHtml(fmtDateTime(r.created_at))+'</td><td>'+escapeHtml(r.details||'')+'</td>';
+          tr.style.cursor='pointer';
+          tr.title='View before/after snapshot';
+          tr.onclick=function(){
+            var old=box.querySelector('.audit-snapshot-detail'); if(old) old.remove();
+            var before=r.before_data, after=r.after_data;
+            function snapshotCard(title,data){
+              if(!data) return '<div style="flex:1;min-width:260px;border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--surface-2);"><div style="font-weight:700;margin-bottom:10px;">'+title+'</div><div class="empty-note">No snapshot available.</div></div>';
+              var d=typeof data==='string'?(function(){try{return JSON.parse(data)}catch(e){return {raw:data}}})():data;
+              var opts=Array.isArray(d.options)?d.options:[];
+              var ans=d.correctAnswer!=null?d.correctAnswer:(d.correctIndex!=null&&opts[d.correctIndex]!=null?opts[d.correctIndex]:'');
+              return '<div style="flex:1;min-width:260px;border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--surface-2);"><div style="font-weight:700;margin-bottom:10px;">'+title+'</div><div style="font-size:12px;line-height:1.8;"><b>Question:</b> '+escapeHtml(d.question||'—')+'<br><b>Team:</b> '+escapeHtml(d.team||'—')+'<br><b>Correct Answer:</b> '+escapeHtml(ans||'—')+'</div></div>';
+            }
+            var detail=document.createElement('div'); detail.className='audit-snapshot-detail'; detail.style.cssText='display:flex;gap:12px;flex-wrap:wrap;margin-top:14px;';
+            detail.innerHTML=snapshotCard('BEFORE',before)+snapshotCard('AFTER',after);
+            tr.parentNode.insertBefore(detail,tr.nextSibling);
+          };
           table.appendChild(tr);
         });
         body.innerHTML=meta; body.appendChild(table);
@@ -989,13 +1072,25 @@ table.data-table tr:last-child td{border-bottom:none;}
     var user = currentUser();
     if(!user){ state.currentUserId = null; sessionSet(SESSION_KEY,''); render(); return; }
 
+    var layout = document.createElement('div');
+    layout.className = 'app-layout';
+    var sidebar = renderSidebar(user);
+    layout.appendChild(sidebar);
+    var overlay = document.createElement('div');
+    overlay.className = 'mobile-sidebar-overlay';
+    overlay.id = 'mobileSidebarOverlay';
+    overlay.onclick = function(){ sidebar.classList.remove('mobile-open'); overlay.classList.remove('open'); };
+    layout.appendChild(overlay);
+    var workspace = document.createElement('div');
+    workspace.className = 'workspace' + (state.sidebarCollapsed ? ' collapsed' : '');
+    workspace.appendChild(renderTopbar());
     var shell = document.createElement('div');
     shell.className = 'shell';
-    shell.appendChild(renderTopbar());
+    workspace.appendChild(shell);
 
     if(user.role !== 'Admin' && anyUnseenKnowledgeUpdateLive()){
       shell.appendChild(renderMandatoryKnowledgeGate());
-      root.appendChild(shell);
+      root.appendChild(layout);
       return;
     }
 
@@ -1024,7 +1119,8 @@ table.data-table tr:last-child td{border-bottom:none;}
       else shell.appendChild(renderUserQuizHome());
     }
 
-    root.appendChild(shell);
+    layout.appendChild(workspace);
+    root.appendChild(layout);
     if(state.quizSession) root.appendChild(renderQuizModal());
     if(state.viewingAttemptId) root.appendChild(renderAttemptDetailModal());
     if(state.viewingKuId) root.appendChild(renderKnowledgeUpdateViewModal());
@@ -1112,79 +1208,125 @@ table.data-table tr:last-child td{border-bottom:none;}
     return wrap;
   }
 
-  /* ================= TOP BAR ================= */
-  function renderTopbar(){
-    var bar = document.createElement('div');
-    bar.className = 'topbar';
+
+  /* ================= MINIMALIST SIDEBAR ICONS ================= */
+  function sidebarIconSvg(name){
+    var paths={
+      users:'<circle cx="12" cy="8" r="3"></circle><path d="M5 20c0-3 2.5-5 7-5s7 2 7 5"></path><path d="M18 6.5c1.7.2 3 1.2 3 3s-1.3 2.8-3 3"></path>',
+      teams:'<circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3 20c0-3.2 2.2-5 6-5s6 1.8 6 5"></path><path d="M15 15.5c3.2.2 5 1.7 5 4.5"></path>',
+      quizmgmt:'<rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M8 7h8M8 11h8M8 15h5"></path><path d="M16 15l1.2 1.2L20 13.5"></path>',
+      disputes:'<path d="M12 3l9 17H3L12 3z"></path><path d="M12 9v4M12 16h.01"></path>',
+      knowledge:'<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"></path><path d="M4 5.5v15M8 7h8M8 11h8"></path>',
+      reports:'<path d="M5 20V10M12 20V4M19 20v-7"></path><path d="M3 20h18"></path>',
+      audit:'<circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path>',
+      backup:'<path d="M4 7h16v13H4z"></path><path d="M8 7V4h8v3M9 12l3-3 3 3M12 9v7"></path>',
+      teamdash:'<path d="M4 19V9M10 19V5M16 19v-7M22 19H2"></path>',
+      password:'<rect x="5" y="10" width="14" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path>',
+      quiz:'<path d="M4 4h16v16H4z"></path><path d="M8 8h8M8 12h8M8 16h5"></path>',
+      history:'<path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 5v5h5M12 7v5l3 2"></path>'
+    };
+    var body=paths[name]||paths.quiz;
+    return '<svg class="sidebar-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+body+'</svg>';
+  }
+
+  /* ================= SIDEBAR ================= */
+  function renderSidebar(user){
+    var side = document.createElement('aside');
+    side.className = 'sidebar' + (state.sidebarCollapsed ? ' collapsed' : '');
+    side.setAttribute('aria-label','Main navigation');
+
     var brand = document.createElement('div');
-    brand.className = 'brand';
-    brand.innerHTML = '<span class="dot"></span>Quiz Portal';
-    bar.appendChild(brand);
+    brand.className = 'sidebar-brand';
+    brand.innerHTML = '<div class="sidebar-brand-mark">Q</div><div class="sidebar-brand-text">Quiz Portal</div>';
+    side.appendChild(brand);
 
-    var user = currentUser();
+    var nav = document.createElement('nav');
+    nav.className = 'sidebar-nav';
+    var label = document.createElement('div');
+    label.className = 'sidebar-section-label';
+    label.textContent = 'Navigation';
+    nav.appendChild(label);
 
+    var items;
     if(user.role === 'Admin'){
       var pendingCount = state.data.disputes.filter(function(d){return d.status==='pending';}).length;
-      var adminDestinations = [
-        ['users','User Accounts'],['teams','Teams'],['quizmgmt','Quiz Management'],
-        ['disputes','Disputes', pendingCount],['knowledge','Knowledge Updates'],
-        ['reports','Reports'],['audit','Audit Log'],['backup','Backup & Restore']
+      items = [
+        ['users','User Accounts','users'],['teams','Teams','teams'],['quizmgmt','Quiz Management','quizmgmt'],
+        ['disputes','Disputes','disputes',pendingCount],['knowledge','Knowledge Updates','knowledge'],
+        ['reports','Reports','reports'],['audit','Audit Log','audit'],['backup','Backup & Restore','backup']
       ];
-      var menuWrap = document.createElement('div');
-      menuWrap.className = 'admin-menu-wrap';
-      var menuBtn = document.createElement('button');
-      menuBtn.type = 'button'; menuBtn.className = 'admin-menu-btn'; menuBtn.innerHTML = '&#8942;';
-      menuBtn.title = 'Admin menu';
-      var panel = document.createElement('div');
-      panel.className = 'admin-menu-panel' + (state.adminMenuOpen ? ' open' : '');
-      adminDestinations.forEach(function(d){
-        var item = document.createElement('div');
-        item.className = 'admin-menu-item' + (state.tab===d[0] ? ' active' : '');
-        item.innerHTML = '<span>'+d[1]+'</span>' + (d[2] ? '<span class="admin-menu-badge">'+d[2]+'</span>' : '');
-        item.onclick = function(){
-          state.tab = d[0];
-          state.editingUserId=null; state.editingQuestionId=null; state.editingQuizId=null; state.editingKuId=null; state.viewingQuestionAuditId=null; state.kuMode='list';
-          state.adminMenuOpen = false;
-          render();
-        };
-        panel.appendChild(item);
-      });
-      menuBtn.onclick = function(e){
-        e.stopPropagation();
-        state.adminMenuOpen = !state.adminMenuOpen;
-        render();
-      };
-      menuWrap.appendChild(menuBtn);
-      menuWrap.appendChild(panel);
-      bar.appendChild(menuWrap);
-      if(state.adminMenuOpen){
-        setTimeout(function(){
-          document.addEventListener('click', function closeOnce(){
-            state.adminMenuOpen = false; render();
-            document.removeEventListener('click', closeOnce);
-          }, {once:true});
-        }, 0);
-      }
+    }else if(user.role === 'Team Leader'){
+      items = [['teamdash','Team Dashboard','teamdash'],['password','Change Password','password']];
+    }else if(user.role === 'Management'){
+      items = [['reports','Reports','reports']];
+    }else{
+      items = [['quiz','Take Quiz','quiz'],['history','My History','history'],['password','Change Password','password']];
     }
 
-    var initials = user.name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
-    var userWrap = document.createElement('div');
-    userWrap.className = 'top-user';
-    var avatarHtml = user.photo ? '<img src="'+user.photo+'">' : initials;
-    userWrap.innerHTML =
-      '<div class="avatar">'+avatarHtml+'</div>'+
-      '<div>'+escapeHtml(user.name)+'<span class="role-pill">'+user.role+(user.team?' \u00b7 '+escapeHtml(user.team):'')+'</span></div>';
-    var logoutBtn = document.createElement('button');
-    logoutBtn.className = 'logout-btn';
-    logoutBtn.textContent = 'Log out';
-    logoutBtn.onclick = function(){
-      state.currentUserId = null;
-      sessionSet(SESSION_KEY, '');
+    items.forEach(function(d){
+      var item = document.createElement('button');
+      item.type='button'; item.className='sidebar-item'+(state.tab===d[0]?' active':'');
+      item.title = d[1];
+      item.setAttribute('aria-label',d[1]);
+      item.innerHTML = '<span class="sidebar-icon">'+sidebarIconSvg(d[2])+'</span><span class="sidebar-label">'+escapeHtml(d[1])+'</span>'+(d[3]?'<span class="sidebar-badge">'+d[3]+'</span>':'');
+      item.onclick=function(){
+        state.tab=d[0]; state.editingUserId=null; state.editingQuestionId=null; state.editingQuizId=null; state.editingKuId=null; state.viewingQuestionAuditId=null; state.kuMode='list';
+        var ov=document.getElementById('mobileSidebarOverlay');
+        if(ov){ov.classList.remove('open');}
+        side.classList.remove('mobile-open');
+        render();
+      };
+      nav.appendChild(item);
+    });
+    side.appendChild(nav);
+
+    // Sidebar footer intentionally contains ONLY the collapse/open control.
+    // The signed-in user's profile is rendered in the top-right header.
+    var footer=document.createElement('div'); footer.className='sidebar-footer';
+
+    var toggle=document.createElement('button'); toggle.type='button'; toggle.className='sidebar-toggle';
+    toggle.setAttribute('aria-label',state.sidebarCollapsed?'Open sidebar':'Hide sidebar');
+    toggle.innerHTML=(state.sidebarCollapsed?'▶':'◀')+' <span>'+(state.sidebarCollapsed?'Open':'Hide')+'</span>';
+    toggle.onclick=function(){
+      state.sidebarCollapsed=!state.sidebarCollapsed;
+      localStorage.setItem('quiz_sidebar_collapsed',state.sidebarCollapsed?'1':'0');
       render();
     };
-    userWrap.appendChild(logoutBtn);
-    bar.appendChild(userWrap);
-    return bar;
+    footer.appendChild(toggle); side.appendChild(footer);
+    return side;
+  }
+
+  /* ================= TOP BAR ================= */
+  function renderTopbar(){
+    var bar=document.createElement('div'); bar.className='topbar';
+    var menu=document.createElement('button'); menu.type='button'; menu.className='topbar-toggle'; menu.innerHTML='☰'; menu.title='Open navigation';
+    menu.onclick=function(){
+      if(window.innerWidth<=900){
+        var side=document.querySelector('.sidebar'); var ov=document.getElementById('mobileSidebarOverlay');
+        if(side){side.classList.toggle('mobile-open');}
+        if(ov){ov.classList.toggle('open');}
+      }else{
+        state.sidebarCollapsed=!state.sidebarCollapsed;
+        localStorage.setItem('quiz_sidebar_collapsed',state.sidebarCollapsed?'1':'0'); render();
+      }
+    };
+    bar.appendChild(menu);
+    var user=currentUser();
+    var pageNames={users:'User Accounts',teams:'Teams',quizmgmt:'Quiz Management',disputes:'Disputes',knowledge:'Knowledge Updates',reports:'Reports',audit:'Audit Log',backup:'Backup & Restore',teamdash:'Team Dashboard',quiz:'Take Quiz',history:'My History',password:'Change Password'};
+    var title=document.createElement('div'); title.className='topbar-page-title'; title.textContent=pageNames[state.tab]||'Dashboard'; bar.appendChild(title);
+    var userWrap=document.createElement('div'); userWrap.className='top-user';
+    var initials=user.name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+    var avatarHtml=user.photo?'<img src="'+user.photo+'">':initials;
+    var avatarEl=document.createElement('div'); avatarEl.className='avatar';
+    if(user.photo){ var img=document.createElement('img'); img.src=user.photo; img.alt=''; avatarEl.appendChild(img); } else { avatarEl.textContent=initials; }
+    userWrap.appendChild(avatarEl);
+    var identity=document.createElement('div'); identity.className='top-user-identity';
+    var nameEl=document.createElement('div'); nameEl.className='top-user-name'; nameEl.textContent=user.name;
+    var roleEl=document.createElement('span'); roleEl.className='role-pill'; roleEl.textContent=user.role;
+    identity.appendChild(nameEl); identity.appendChild(roleEl); userWrap.appendChild(identity);
+    var logoutBtn=document.createElement('button'); logoutBtn.type='button'; logoutBtn.className='logout-btn'; logoutBtn.textContent='Log out';
+    logoutBtn.onclick=function(){state.currentUserId=null;sessionSet(SESSION_KEY,'');render();};
+    userWrap.appendChild(logoutBtn); bar.appendChild(userWrap); return bar;
   }
 
   /* ================= TAB BARS ================= */
