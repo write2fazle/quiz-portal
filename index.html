@@ -378,6 +378,7 @@ table.data-table tr:last-child td{border-bottom:none;}
     kuSearchName: '',
     kuGateIndex: 0,
     viewingKuId: null,
+    viewingQuestionAuditId: null,
     adminMenuOpen: false
   };
 
@@ -611,7 +612,33 @@ table.data-table tr:last-child td{border-bottom:none;}
     if(!d.questionBank) d.questionBank = [];
     d.questionBank.forEach(function(q){
       if(!q.acceptedIndexes) q.acceptedIndexes = [q.correctIndex];
+      if(!q.createdBy) q.createdBy = {id:null, name:'Legacy / Unknown', email:''};
+      if(q.createdAt === undefined) q.createdAt = null;
+      if(q.updatedBy === undefined) q.updatedBy = null;
+      if(q.updatedAt === undefined) q.updatedAt = null;
     });
+
+    // Build the completed-quiz index from quiz_attempts every time data loads.
+    // This is the authoritative source, so users who completed a quiz before
+    // the userCompletedQuizzes meta key existed will still be blocked.
+    var completedMap = {};
+    (d.quizAttempts || []).forEach(function(attempt){
+      if(!attempt || !attempt.userId || !attempt.quizId) return;
+      if(!completedMap[attempt.userId]) completedMap[attempt.userId] = [];
+      if(completedMap[attempt.userId].indexOf(attempt.quizId) === -1){
+        completedMap[attempt.userId].push(attempt.quizId);
+      }
+    });
+    Object.keys(d.userCompletedQuizzes || {}).forEach(function(userId){
+      if(!completedMap[userId]) completedMap[userId] = [];
+      (d.userCompletedQuizzes[userId] || []).forEach(function(quizId){
+        if(completedMap[userId].indexOf(quizId) === -1){
+          completedMap[userId].push(quizId);
+        }
+      });
+    });
+    d.userCompletedQuizzes = completedMap;
+
     d.users.forEach(function(u){
       if(u.team === undefined) u.team = null;
       if(u.photo === undefined) u.photo = null;
@@ -698,6 +725,138 @@ table.data-table tr:last-child td{border-bottom:none;}
   function currentUser(){
     return state.data.users.find(function(u){return u.id===state.currentUserId;});
   }
+
+  /* ================= QUESTION AUDIT TRAIL ================= */
+  function auditActor(){
+    var u = currentUser();
+    return u ? {id:u.id, name:u.name || '', email:u.email || '', role:u.role || ''} : {id:null, name:'Unknown', email:'', role:''};
+  }
+
+  function stampQuestionCreate(q){
+    var a = auditActor();
+    var now = new Date().toISOString();
+    q.createdBy = {id:a.id, name:a.name, email:a.email};
+    q.createdAt = now;
+    q.updatedBy = null;
+    q.updatedAt = null;
+    return q;
+  }
+
+  function stampQuestionUpdate(q){
+    var a = auditActor();
+    q.updatedBy = {id:a.id, name:a.name, email:a.email};
+    q.updatedAt = new Date().toISOString();
+    if(!q.createdBy) q.createdBy = {id:null, name:'Legacy / Unknown', email:''};
+    if(!q.createdAt) q.createdAt = null;
+    return q;
+  }
+
+  async function writeAuditLog(action, moduleName, recordId, details, beforeData, afterData){
+    try{
+      var a = auditActor();
+      var row = {
+        action: action,
+        module: moduleName,
+        record_id: recordId || null,
+        user_id: a.id,
+        user_name: a.name,
+        user_email: a.email,
+        user_role: a.role,
+        details: details || null,
+        before_data: beforeData || null,
+        after_data: afterData || null,
+        created_at: new Date().toISOString()
+      };
+      await supaRequest(supaUrl('audit_logs'), {method:'POST', body:JSON.stringify(row)});
+      return true;
+    }catch(e){
+      console.error('Audit log write failed:', e);
+      return false;
+    }
+  }
+
+  async function readAuditLogs(filters){
+    filters = filters || {};
+    var q = '?select=id,action,module,record_id,user_id,user_name,user_email,user_role,details,before_data,after_data,created_at&order=created_at.desc&limit=500';
+    if(filters.module) q += '&module=eq.' + encodeURIComponent(filters.module);
+    if(filters.recordId) q += '&record_id=eq.' + encodeURIComponent(filters.recordId);
+    if(filters.userEmail) q += '&user_email=ilike.*' + encodeURIComponent(filters.userEmail) + '*';
+    return await supaRequest(supaUrl('audit_logs', q));
+  }
+
+  function auditActionBadge(action){
+    var cls = action==='CREATE' ? 'green' : (action==='DELETE' ? 'red' : 'orange');
+    var bg = cls==='green' ? 'var(--green-bg)' : (cls==='red' ? 'var(--red-bg)' : '#FFF1E4');
+    var color = cls==='green' ? 'var(--green)' : (cls==='red' ? 'var(--red)' : 'var(--orange)');
+    return '<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;background:'+bg+';color:'+color+';">'+escapeHtml(action)+'</span>';
+  }
+
+  function renderAuditLogAdmin(){
+    var wrap=document.createElement('div');
+    var card=document.createElement('div'); card.className='card';
+    card.innerHTML='<div class="section-title">Audit Log</div>'+
+      '<div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;line-height:1.6;">Track who created, updated or deleted Question Bank records. Showing the latest 500 events.</div>';
+    var toolbar=document.createElement('div'); toolbar.className='filter-row';
+    var moduleSel=document.createElement('select'); moduleSel.innerHTML='<option value="">All modules</option><option value="Question Bank">Question Bank</option>';
+    var userInput=document.createElement('input'); userInput.type='text'; userInput.placeholder='Filter by user email';
+    var refreshBtn=document.createElement('button'); refreshBtn.className='btn primary small'; refreshBtn.textContent='Load Audit Log';
+    var exportBtn=document.createElement('button'); exportBtn.className='btn secondary small'; exportBtn.textContent='Export CSV'; exportBtn.disabled=true;
+    toolbar.appendChild(moduleSel); toolbar.appendChild(userInput); toolbar.appendChild(refreshBtn); toolbar.appendChild(exportBtn); card.appendChild(toolbar);
+    var result=document.createElement('div'); result.innerHTML='<div class="empty-note">Click Load Audit Log to view activity.</div>'; card.appendChild(result);
+    wrap.appendChild(card);
+    var latestRows=[];
+    async function load(){
+      result.innerHTML='<div class="empty-note">Loading audit log...</div>';
+      try{
+        latestRows=await readAuditLogs({module:moduleSel.value,userEmail:userInput.value.trim()});
+        exportBtn.disabled=!latestRows.length;
+        if(!latestRows.length){ result.innerHTML='<div class="empty-note">No audit activity found.</div>'; return; }
+        var table=document.createElement('table'); table.className='data-table';
+        table.innerHTML='<tr><th>Action</th><th>Module</th><th>Record ID</th><th>User</th><th>Email</th><th>Date / Time</th><th>Details</th></tr>';
+        latestRows.forEach(function(r){
+          var tr=document.createElement('tr');
+          tr.innerHTML='<td>'+auditActionBadge(r.action)+'</td><td>'+escapeHtml(r.module)+'</td><td style="font-family:JetBrains Mono,monospace;font-size:11px;">'+escapeHtml(r.record_id||'')+'</td><td>'+escapeHtml(r.user_name||'')+'</td><td>'+escapeHtml(r.user_email||'')+'</td><td>'+escapeHtml(fmtDateTime(r.created_at))+'</td><td>'+escapeHtml(r.details||'')+'</td>';
+          table.appendChild(tr);
+        });
+        result.innerHTML=''; result.appendChild(table);
+      }catch(e){ result.innerHTML='<div class="empty-note" style="color:var(--red);">Could not load audit log: '+escapeHtml(e.message||e)+'</div>'; }
+    }
+    refreshBtn.onclick=load;
+    exportBtn.onclick=function(){
+      downloadCSV('question-bank-audit-log.csv',['Action','Module','Record ID','User ID','User Name','User Email','User Role','Details','Created At'],latestRows.map(function(r){return [r.action,r.module,r.record_id,r.user_id,r.user_name,r.user_email,r.user_role,r.details,r.created_at];}));
+    };
+    return wrap;
+  }
+
+  function renderQuestionAuditModal(questionId){
+    var overlay=document.createElement('div'); overlay.className='modal-overlay';
+    var box=document.createElement('div'); box.className='modal-box wide';
+    var q=state.data.questionBank.find(function(x){return x.id===questionId;});
+    box.innerHTML='<div class="modal-head"><div><h3 class="modal-title">Question Audit History</h3><div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Record ID: '+escapeHtml(questionId)+'</div></div><button class="modal-close">&times;</button></div><div id="questionAuditBody"><div class="empty-note">Loading...</div></div>';
+    box.querySelector('.modal-close').onclick=function(){state.viewingQuestionAuditId=null;render();};
+    overlay.appendChild(box);
+    setTimeout(async function(){
+      try{
+        var rows=await readAuditLogs({module:'Question Bank',recordId:questionId});
+        var body=box.querySelector('#questionAuditBody');
+        var meta='';
+        if(q){
+          var c=q.createdBy||{name:'Legacy / Unknown',email:''};
+          meta='<div style="background:var(--surface-2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;line-height:1.8;">'+
+            '<b>Created By:</b> '+escapeHtml(c.name||'Legacy / Unknown')+' '+(c.email?'('+escapeHtml(c.email)+')':'')+'<br>'+
+            '<b>Created At:</b> '+escapeHtml(q.createdAt?fmtDateTime(q.createdAt):'Unknown')+'<br>'+
+            '<b>Last Updated By:</b> '+escapeHtml(q.updatedBy ? q.updatedBy.name : '—')+' '+(q.updatedBy&&q.updatedBy.email?'('+escapeHtml(q.updatedBy.email)+')':'')+'<br>'+
+            '<b>Last Updated At:</b> '+escapeHtml(q.updatedAt?fmtDateTime(q.updatedAt):'—')+'</div>';
+        }
+        if(!rows.length){ body.innerHTML=meta+'<div class="empty-note">No audit events found for this question.</div>'; return; }
+        var table=document.createElement('table'); table.className='data-table'; table.innerHTML='<tr><th>Action</th><th>User</th><th>Email</th><th>Date / Time</th><th>Details</th></tr>';
+        rows.forEach(function(r){ var tr=document.createElement('tr'); tr.innerHTML='<td>'+auditActionBadge(r.action)+'</td><td>'+escapeHtml(r.user_name||'')+'</td><td>'+escapeHtml(r.user_email||'')+'</td><td>'+escapeHtml(fmtDateTime(r.created_at))+'</td><td>'+escapeHtml(r.details||'')+'</td>'; table.appendChild(tr); });
+        body.innerHTML=meta; body.appendChild(table);
+      }catch(e){ box.querySelector('#questionAuditBody').innerHTML='<div class="empty-note" style="color:var(--red);">Could not load audit history: '+escapeHtml(e.message||e)+'</div>'; }
+    },0);
+    return overlay;
+  }
+
   function isAnswerAccepted(question, index){
     return question.acceptedIndexes.indexOf(index) !== -1;
   }
@@ -788,6 +947,7 @@ table.data-table tr:last-child td{border-bottom:none;}
       else if(state.tab === 'knowledge') shell.appendChild(renderKnowledgeUpdatesAdmin());
       else if(state.tab === 'reports') shell.appendChild(renderReports(null));
       else if(state.tab === 'backup') shell.appendChild(renderBackupRestore());
+      else if(state.tab === 'audit') shell.appendChild(renderAuditLogAdmin());
       else shell.appendChild(renderUserManagement());
     }else if(user.role === 'Management'){
       shell.appendChild(renderReports(null));
@@ -808,6 +968,7 @@ table.data-table tr:last-child td{border-bottom:none;}
     if(state.quizSession) root.appendChild(renderQuizModal());
     if(state.viewingAttemptId) root.appendChild(renderAttemptDetailModal());
     if(state.viewingKuId) root.appendChild(renderKnowledgeUpdateViewModal());
+    if(state.viewingQuestionAuditId) root.appendChild(renderQuestionAuditModal(state.viewingQuestionAuditId));
   }
 
   /* ================= LOGIN ================= */
@@ -907,7 +1068,7 @@ table.data-table tr:last-child td{border-bottom:none;}
       var adminDestinations = [
         ['users','User Accounts'],['teams','Teams'],['quizmgmt','Quiz Management'],
         ['disputes','Disputes', pendingCount],['knowledge','Knowledge Updates'],
-        ['reports','Reports'],['backup','Backup & Restore']
+        ['reports','Reports'],['audit','Audit Log'],['backup','Backup & Restore']
       ];
       var menuWrap = document.createElement('div');
       menuWrap.className = 'admin-menu-wrap';
@@ -922,7 +1083,7 @@ table.data-table tr:last-child td{border-bottom:none;}
         item.innerHTML = '<span>'+d[1]+'</span>' + (d[2] ? '<span class="admin-menu-badge">'+d[2]+'</span>' : '');
         item.onclick = function(){
           state.tab = d[0];
-          state.editingUserId=null; state.editingQuestionId=null; state.editingQuizId=null; state.editingKuId=null; state.kuMode='list';
+          state.editingUserId=null; state.editingQuestionId=null; state.editingQuizId=null; state.editingKuId=null; state.viewingQuestionAuditId=null; state.kuMode='list';
           state.adminMenuOpen = false;
           render();
         };
@@ -971,11 +1132,11 @@ table.data-table tr:last-child td{border-bottom:none;}
     var tabs = document.createElement('div');
     tabs.className = 'tabs';
     var pendingCount = state.data.disputes.filter(function(d){return d.status==='pending';}).length;
-    [['users','User Accounts'],['teams','Teams'],['quizmgmt','Quiz Management'],['disputes','Disputes'+(pendingCount?' ('+pendingCount+')':'')],['knowledge','Knowledge Updates'],['reports','Reports'],['backup','Backup & Restore']].forEach(function(t){
+    [['users','User Accounts'],['teams','Teams'],['quizmgmt','Quiz Management'],['disputes','Disputes'+(pendingCount?' ('+pendingCount+')':'')],['knowledge','Knowledge Updates'],['reports','Reports'],['audit','Audit Log'],['backup','Backup & Restore']].forEach(function(t){
       var btn = document.createElement('button');
       btn.className = 'tab-btn' + (state.tab===t[0] ? ' active' : '');
       btn.textContent = t[1];
-      btn.onclick = function(){ state.tab = t[0]; state.editingUserId=null; state.editingQuestionId=null; state.editingQuizId=null; state.editingKuId=null; state.kuMode='list'; render(); };
+      btn.onclick = function(){ state.tab = t[0]; state.editingUserId=null; state.editingQuestionId=null; state.editingQuizId=null; state.editingKuId=null; state.viewingQuestionAuditId=null; state.kuMode='list'; render(); };
       tabs.appendChild(btn);
     });
     return tabs;
@@ -1268,19 +1429,27 @@ table.data-table tr:last-child td{border-bottom:none;}
     var addQBtn = document.createElement('button');
     addQBtn.className = 'btn primary';
     addQBtn.textContent = editing ? 'Save changes' : 'Add to question bank';
-    addQBtn.onclick = function(){
+    addQBtn.onclick = async function(){
       var opts = optInputs.map(function(o){return o.value.trim();});
       if(!qInput.value.trim() || opts.some(function(o){return !o;})){ alert('Fill in the question and all four options.'); return; }
       if(correctSel.value === ''){ alert('You must select the correct answer before this question can be saved to the bank.'); return; }
       var correctIdx = parseInt(correctSel.value,10);
+      var auditAction = editing ? 'UPDATE' : 'CREATE';
+      var auditBefore = editing ? clone(editing) : null;
+      var savedQuestion;
       if(editing){
         editing.team = teamSel.value; editing.question = qInput.value.trim();
         editing.options = opts; editing.correctIndex = correctIdx; editing.acceptedIndexes = [correctIdx];
+        stampQuestionUpdate(editing);
+        savedQuestion = clone(editing);
       }else{
-        state.data.questionBank.push({id:uid(), team:teamSel.value, question:qInput.value.trim(), options:opts, correctIndex:correctIdx, acceptedIndexes:[correctIdx]});
+        savedQuestion = stampQuestionCreate({id:uid(), team:teamSel.value, question:qInput.value.trim(), options:opts, correctIndex:correctIdx, acceptedIndexes:[correctIdx]});
+        state.data.questionBank.push(savedQuestion);
       }
       state.editingQuestionId = null;
-      saveData(); render();
+      await saveData();
+      await writeAuditLog(auditAction, 'Question Bank', savedQuestion.id, auditAction==='CREATE' ? 'Question created' : 'Question updated', auditBefore, savedQuestion);
+      render();
     };
     card.appendChild(addQBtn);
     if(editing){
@@ -1298,26 +1467,34 @@ table.data-table tr:last-child td{border-bottom:none;}
     state.data.teams.forEach(function(tm){ (state.data.teamUsedQuestionIds[tm]||[]).forEach(function(id){ usedIds[id]=true; }); });
     var table = document.createElement('table');
     table.className = 'data-table';
-    table.innerHTML = '<tr><th>Team</th><th>Question</th><th>Correct answer</th><th>Status</th><th></th></tr>';
+    table.innerHTML = '<tr><th>Team</th><th>Question</th><th>Correct answer</th><th>Created By</th><th>Status</th><th></th></tr>';
     state.data.questionBank.forEach(function(q){
       var tr = document.createElement('tr');
       var usedBadge = usedIds[q.id] ? '<span style="font-size:11px;color:var(--text-mute);">Used in a quiz</span>' : '<span style="font-size:11px;color:var(--green);">Available</span>';
-      tr.innerHTML = '<td>'+escapeHtml(q.team)+'</td><td>'+escapeHtml(q.question)+'</td><td>'+escapeHtml(q.options[q.correctIndex])+'</td><td>'+usedBadge+'</td>';
+      var creator = q.createdBy || {name:'Legacy / Unknown',email:''};
+      tr.innerHTML = '<td>'+escapeHtml(q.team)+'</td><td>'+escapeHtml(q.question)+'</td><td>'+escapeHtml(q.options[q.correctIndex])+'</td><td><div style="font-size:12px;">'+escapeHtml(creator.name||'Legacy / Unknown')+'</div><div style="font-size:10px;color:var(--text-mute);">'+escapeHtml(creator.email||'')+'</div></td><td>'+usedBadge+'</td>';
       var tdA = document.createElement('td');
       tdA.style.cssText = 'display:flex;gap:6px;';
       var editBtn = document.createElement('button');
       editBtn.className = 'btn secondary small'; editBtn.textContent = 'Edit';
       editBtn.onclick = function(){ state.editingQuestionId = q.id; render(); };
+      var auditBtn = document.createElement('button');
+      auditBtn.className = 'btn secondary small'; auditBtn.textContent = 'Audit';
+      auditBtn.onclick = function(){ state.viewingQuestionAuditId = q.id; render(); };
       var delBtn = document.createElement('button');
       delBtn.className = 'btn danger small'; delBtn.textContent = 'Delete';
-      delBtn.onclick = function(){
+      delBtn.onclick = async function(){
+        if(!confirm('Delete this question? The audit history will be preserved.')) return;
+        var deletedSnapshot = clone(q);
         state.data.questionBank = state.data.questionBank.filter(function(x){return x.id!==q.id;});
         Object.keys(state.data.teamUsedQuestionIds).forEach(function(tm){
           state.data.teamUsedQuestionIds[tm] = (state.data.teamUsedQuestionIds[tm]||[]).filter(function(id){return id!==q.id;});
         });
-        saveData(); render();
+        await saveData();
+        await writeAuditLog('DELETE', 'Question Bank', q.id, 'Question deleted', deletedSnapshot, null);
+        render();
       };
-      tdA.appendChild(editBtn); tdA.appendChild(delBtn);
+      tdA.appendChild(editBtn); tdA.appendChild(auditBtn); tdA.appendChild(delBtn);
       tr.appendChild(tdA);
       table.appendChild(tr);
     });
@@ -2317,7 +2494,11 @@ table.data-table tr:last-child td{border-bottom:none;}
     card.innerHTML = '<div class="section-title">Available quizzes for '+escapeHtml(user.team)+'</div>';
 
     var completed = state.data.userCompletedQuizzes[state.currentUserId] || [];
-    var available = state.data.quizzes.filter(function(q){ return q.team === user.team && quizStatus(q) !== 'off'; });
+    var available = state.data.quizzes.filter(function(q){
+      return q.team === user.team &&
+             quizStatus(q) !== 'off' &&
+             completed.indexOf(q.id) === -1;
+    });
     if(available.length === 0){
       card.innerHTML += '<div class="empty-note">No quizzes have been scheduled for your team yet.</div>';
     }else{
@@ -2543,6 +2724,15 @@ table.data-table tr:last-child td{border-bottom:none;}
 
   /* ================= QUIZ TAKING ================= */
   function openQuiz(quiz){
+    var userId = state.currentUserId;
+    var alreadyAttempted = (state.data.quizAttempts || []).some(function(attempt){
+      return attempt && attempt.userId === userId && attempt.quizId === quiz.id;
+    });
+    if(alreadyAttempted){
+      notify('You have already completed this quiz.','error');
+      return;
+    }
+
     var qs = {
       quiz: quiz,
       questions: quiz.questionIds.map(function(id){ return state.data.questionBank.find(function(q){return q.id===id;}); }).filter(Boolean),
@@ -2688,10 +2878,24 @@ table.data-table tr:last-child td{border-bottom:none;}
     return overlay;
   }
 
-  function finishQuiz(){
+  async function finishQuiz(){
     var qs = state.quizSession;
     if(qs.done) return;
+
     var user = currentUser();
+
+    // Prevent duplicate submission using the locally loaded attempts.
+    var duplicateAttempt = (state.data.quizAttempts || []).some(function(attempt){
+      return attempt && attempt.userId === state.currentUserId && attempt.quizId === qs.quiz.id;
+    });
+    if(duplicateAttempt){
+      qs.done = true;
+      state.quizSession = null;
+      notify('You have already completed this quiz.','error');
+      render();
+      return;
+    }
+
     var score = 0;
     var answers = qs.questions.map(function(q, i){
       var selIndex = qs.selections[i];
@@ -2719,7 +2923,9 @@ table.data-table tr:last-child td{border-bottom:none;}
     qs.attemptId = attempt.id;
     qs.finalScore = score;
     qs.done = true;
-    saveData();
+    await saveData();
+    state.quizSession = null;
+    state.tab = 'history';
     render();
   }
 
