@@ -558,12 +558,28 @@ table.data-table tr:last-child td{border-bottom:none;}
     // Current Supabase schema: public.users(id text, data jsonb, created_at, updated_at).
     // Preserve the complete user object inside data so email/password/role/team
     // and mustChangePassword are never lost.
-    var rows = (items || []).map(function(u){
+    // IMPORTANT: also delete database users that are no longer present in the
+    // current portal state. The previous version only UPSERTed users, so a
+    // deleted account remained in Supabase and came back after reload.
+    items = items || [];
+    var rows = items.map(function(u){
       var id = u.id || uid();
       var copy = clone(u);
       copy.id = id;
       return {id:id, data:JSON.stringify(copy), updated_at:new Date().toISOString()};
     });
+
+    var currentRows = await supaRequest(supaUrl('users', '?select=id'));
+    var keepIds = {};
+    rows.forEach(function(r){ keepIds[String(r.id)] = true; });
+
+    // Remove accounts deleted from the portal.
+    // Wait for all deletion requests to complete before upserting remaining users.
+    var deleteJobs = (currentRows || []).filter(function(row){ return !keepIds[String(row.id)]; }).map(function(row){
+      return supaRequest(supaUrl('users', '?id=eq.' + encodeURIComponent(row.id)), {method:'DELETE'});
+    });
+    if(deleteJobs.length) await Promise.all(deleteJobs);
+
     if(rows.length){
       await supaRequest(supaUrl('users') + '?on_conflict=id', {
         method:'POST',
