@@ -208,6 +208,95 @@ table.data-table tr:last-child td{border-bottom:none;}
 @media(max-width:640px){
   .stat-grid{grid-template-columns:1fr 1fr;}
 }
+/* ---- fixed sidebar / fluid workspace ---- */
+.app-layout{min-height:100vh;width:100%;}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:258px;background:#FFFFFF;color:#344054;border-right:1px solid rgba(255,255,255,.07);z-index:200;display:flex;flex-direction:column;transition:width .25s ease,transform .25s ease;box-shadow:10px 0 30px rgba(0,0,0,.10);}
+.sidebar.collapsed{width:76px;}
+.sidebar-brand{height:72px;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid rgba(255,255,255,.07);flex:none;}
+.sidebar-brand-mark{width:36px;height:36px;border-radius:10px;background:var(--orange);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;box-shadow:0 5px 18px rgba(244,107,18,.25);flex:none;}
+.sidebar-brand-text{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;}
+.sidebar.collapsed .sidebar-brand{justify-content:center;padding:0 10px;}
+.sidebar.collapsed .sidebar-brand-text{display:none;}
+.sidebar-nav{padding:16px 12px;overflow-y:auto;flex:1;}
+.sidebar-section-label{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:#6B7280;padding:4px 10px 9px;}
+.sidebar-item{width:100%;display:flex;align-items:center;gap:12px;border:0;background:transparent;color:#9CA3AF;border-radius:9px;padding:10px 11px;margin-bottom:3px;font-size:13px;font-weight:500;text-align:left;transition:background .18s ease,color .18s ease,transform .18s ease;position:relative;}
+.sidebar-item:hover{background:#F8FAFC;color:#F9FAFB;}
+.sidebar-item.active{background:rgba(244,107,18,.14);color:#FDBA74;font-weight:600;}
+.sidebar-item.active:before{content:'';position:absolute;left:-12px;top:8px;bottom:8px;width:3px;border-radius:0 4px 4px 0;background:var(--orange);}
+.sidebar-icon{width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;flex:none;font-size:16px;}
+.sidebar-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sidebar-badge{margin-left:auto;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#DC2626;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;}
+.sidebar.collapsed .sidebar-section-label,.sidebar.collapsed .sidebar-label,.sidebar.collapsed .sidebar-badge{display:none;}
+.sidebar.collapsed .sidebar-item{justify-content:center;padding:10px 8px;}
+.sidebar.collapsed .sidebar-item.active:before{left:0;}
+.sidebar-footer{padding:12px;border-top:1px solid rgba(255,255,255,.07);flex:none;}
+.sidebar-user{display:flex;align-items:center;gap:10px;padding:8px;border-radius:9px;background:rgba(255,255,255,.04);margin-bottom:8px;overflow:hidden;}
+.sidebar-user-info{min-width:0;flex:1;}
+.sidebar-user-name{font-size:12px;font-weight:600;color:#F3F4F6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sidebar-user-role{font-size:10px;color:#6B7280;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sidebar.collapsed .sidebar-user{justify-content:center;padding:7px 3px;}
+.sidebar.collapsed .sidebar-user-info{display:none;}
+.sidebar-toggle{width:100%;height:36px;border:1px solid rgba(255,255,255,.08);background:#F8FAFC;color:#9CA3AF;border-radius:8px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;}
+.sidebar-toggle:hover{background:#273449;color:#fff;}
+.sidebar.collapsed .sidebar-toggle span{display:none;}
+.workspace{margin-left:258px;min-height:100vh;width:calc(100% - 258px);transition:margin-left .25s ease,width .25s ease;}
+.workspace.collapsed{margin-left:76px;width:calc(100% - 76px);}
+.mobile-sidebar-overlay{display:none;}
+
+/* ---- top bar ---- */
+.topbar{display:flex;align-items:center;gap:12px;background:var(--navy);color:#fff;border-radius:0;padding:14px 22px;margin:0 0 20px;min-height:64px;position:sticky;top:0;z-index:100;}
+.topbar-page-title{font-size:14px;font-weight:600;color:#fff;}
+.topbar-toggle{width:36px;height:36px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:18px;}
+.topbar-toggle:hover{background:rgba(255,255,255,.16);}
+.brand{font-weight:700;font-size:17px;display:flex;align-items:center;gap:10px;}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:var(--orange);}
+.top-user{display:flex;align-items:center;gap:12px;margin-left:auto;font-size:13px;}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--orange);color:#fff;font-weight:600;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden;}
+.avatar img{width:100%;height:100%;object-fit:cover;}
+.role-pill{font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,0.15);margin-left:6px;}
+.logout-btn{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);color:#fff;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;}
+.logout-btn:hover{background:rgba(255,255,255,0.25);}
+
+
+/* Minimalist flat vector sidebar icons */
+.sidebar-icon{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;flex:0 0 22px;line-height:1}
+.sidebar-svg-icon{width:20px;height:20px;display:block;stroke:currentColor;fill:none;vector-effect:non-scaling-stroke}
+.sidebar-item.active .sidebar-svg-icon,.sidebar-item:hover .sidebar-svg-icon{stroke:currentColor}
+
+/* ===== Screenshot-matched light premium navigation ===== */
+.shell{width:100%;max-width:none;margin:0;padding:0 28px 60px;}
+.sidebar{width:270px;background:#fff;color:#344054;border-right:1px solid #E4E7EC;box-shadow:2px 0 12px rgba(16,24,40,.04);}
+.sidebar.collapsed{width:76px;}
+.sidebar-brand{height:64px;padding:0 18px;border-bottom:1px solid #F0F2F5;}
+.sidebar-brand-mark{width:36px;height:36px;border-radius:10px;background:#F46B12;box-shadow:0 5px 18px rgba(244,107,18,.20);}
+.sidebar-brand-text{font-size:15px;color:#1D2939;}
+.sidebar-nav{padding:24px 12px 12px;}
+.sidebar-section-label{color:#98A2B3;font-size:9px;letter-spacing:.14em;padding:4px 10px 10px;}
+.sidebar-item{color:#475467;border-radius:9px;padding:10px 11px;margin-bottom:4px;font-size:13px;}
+.sidebar-item:hover{background:#F9FAFB;color:#F46B12;}
+.sidebar-item.active{background:#FFF1E8;color:#F46B12;font-weight:600;}
+.sidebar-item.active:before{left:-12px;top:8px;bottom:8px;width:3px;background:#F46B12;}
+.sidebar-footer{padding:10px 12px 12px;border-top:1px solid #F0F2F5;}
+.sidebar-toggle{height:38px;background:#F8FAFC;border:1px solid #F0F2F5;color:#667085;border-radius:8px;}
+.sidebar-toggle:hover{background:#FFF7F2;color:#F46B12;border-color:#F46B12;}
+.workspace{margin-left:270px;width:calc(100% - 270px);min-height:100vh;background:#F8FAFC;transition:margin-left .25s ease,width .25s ease;}
+.workspace.collapsed{margin-left:76px;width:calc(100% - 76px);}
+.topbar{height:64px;min-height:64px;display:flex;align-items:center;background:#fff;color:#344054;border-radius:0;border-bottom:1px solid #EAECF0;padding:0 24px;margin:0;position:sticky;top:0;z-index:100;box-shadow:0 1px 2px rgba(16,24,40,.02);}
+.topbar-page-title,.topbar-toggle{display:none;}
+.top-user{gap:12px;color:#344054;font-size:13px;}
+.top-user>div:nth-child(2){color:#344054;font-weight:600;white-space:nowrap;}
+.avatar{width:36px;height:36px;background:#F46B12;font-size:11px;}
+.role-pill{background:#F2F4F7;color:#667085;border:1px solid #E4E7EC;margin-left:7px;padding:3px 8px;font-size:10px;}
+.logout-btn{background:#fff;border:1px solid #D0D5DD;color:#475467;border-radius:8px;padding:8px 14px;font-size:12px;}
+.logout-btn:hover{background:#F9FAFB;border-color:#98A2B3;color:#344054;}
+@media(max-width:900px){
+  .sidebar{transform:translateX(-100%);width:270px;}
+  .sidebar.mobile-open{transform:translateX(0);}
+  .workspace,.workspace.collapsed{margin-left:0;width:100%;}
+  .topbar-toggle{display:inline-flex;}
+  .topbar{padding:0 16px;}
+  .shell{padding:0 16px 50px;}
+}
 </style>
 </head>
 <body>
@@ -380,7 +469,8 @@ table.data-table tr:last-child td{border-bottom:none;}
     kuGateIndex: 0,
     viewingKuId: null,
     viewingQuestionAuditId: null,
-    adminMenuOpen: false
+    adminMenuOpen: false,
+    sidebarCollapsed: localStorage.getItem('quiz_sidebar_collapsed') === '1'
   };
 
   var SESSION_KEY = 'quiz-portal-session-v1';
@@ -1060,13 +1150,27 @@ table.data-table tr:last-child td{border-bottom:none;}
     var user = currentUser();
     if(!user){ state.currentUserId = null; sessionSet(SESSION_KEY,''); render(); return; }
 
+    var layout = document.createElement('div');
+    layout.className = 'app-layout';
+    var sidebar = renderSidebar(user);
+    layout.appendChild(sidebar);
+    var overlay = document.createElement('div');
+    overlay.className = 'mobile-sidebar-overlay';
+    overlay.id = 'mobileSidebarOverlay';
+    overlay.onclick = function(){ sidebar.classList.remove('mobile-open'); overlay.classList.remove('open'); };
+    layout.appendChild(overlay);
+
+    var workspace = document.createElement('div');
+    workspace.className = 'workspace' + (state.sidebarCollapsed ? ' collapsed' : '');
+    workspace.appendChild(renderTopbar());
     var shell = document.createElement('div');
     shell.className = 'shell';
-    shell.appendChild(renderTopbar());
+    workspace.appendChild(shell);
 
     if(user.role !== 'Admin' && anyUnseenKnowledgeUpdateLive()){
       shell.appendChild(renderMandatoryKnowledgeGate());
-      root.appendChild(shell);
+      layout.appendChild(workspace);
+      root.appendChild(layout);
       return;
     }
 
@@ -1095,7 +1199,8 @@ table.data-table tr:last-child td{border-bottom:none;}
       else shell.appendChild(renderUserQuizHome());
     }
 
-    root.appendChild(shell);
+    layout.appendChild(workspace);
+    root.appendChild(layout);
     if(state.quizSession) root.appendChild(renderQuizModal());
     if(state.viewingAttemptId) root.appendChild(renderAttemptDetailModal());
     if(state.viewingKuId) root.appendChild(renderKnowledgeUpdateViewModal());
@@ -1183,78 +1288,114 @@ table.data-table tr:last-child td{border-bottom:none;}
     return wrap;
   }
 
-  /* ================= TOP BAR ================= */
-  function renderTopbar(){
-    var bar = document.createElement('div');
-    bar.className = 'topbar';
+  /* ================= MINIMALIST SIDEBAR ICONS ================= */
+  function sidebarIconSvg(name){
+    var paths={
+      users:'<circle cx="12" cy="8" r="3"></circle><path d="M5 20c0-3 2.5-5 7-5s7 2 7 5"></path><path d="M18 6.5c1.7.2 3 1.2 3 3s-1.3 2.8-3 3"></path>',
+      teams:'<circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3 20c0-3.2 2.2-5 6-5s6 1.8 6 5"></path><path d="M15 15.5c3.2.2 5 1.7 5 4.5"></path>',
+      quizmgmt:'<rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M8 7h8M8 11h8M8 15h5"></path><path d="M16 15l1.2 1.2L20 13.5"></path>',
+      disputes:'<path d="M12 3l9 17H3L12 3z"></path><path d="M12 9v4M12 16h.01"></path>',
+      knowledge:'<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"></path><path d="M4 5.5v15M8 7h8M8 11h8"></path>',
+      reports:'<path d="M5 20V10M12 20V4M19 20v-7"></path><path d="M3 20h18"></path>',
+      audit:'<circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path>',
+      backup:'<path d="M4 7h16v13H4z"></path><path d="M8 7V4h8v3M9 12l3-3 3 3M12 9v7"></path>',
+      teamdash:'<path d="M4 19V9M10 19V5M16 19v-7M22 19H2"></path>',
+      password:'<rect x="5" y="10" width="14" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path>',
+      quiz:'<path d="M4 4h16v16H4z"></path><path d="M8 8h8M8 12h8M8 16h5"></path>',
+      history:'<path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 5v5h5M12 7v5l3 2"></path>'
+    };
+    var body=paths[name]||paths.quiz;
+    return '<svg class="sidebar-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+body+'</svg>';
+  }
+
+  /* ================= SIDEBAR ================= */
+  function renderSidebar(user){
+    var side = document.createElement('aside');
+    side.className = 'sidebar' + (state.sidebarCollapsed ? ' collapsed' : '');
+    side.setAttribute('aria-label','Main navigation');
+
     var brand = document.createElement('div');
-    brand.className = 'brand';
-    brand.innerHTML = '<span class="dot"></span>Quiz Portal';
-    bar.appendChild(brand);
+    brand.className = 'sidebar-brand';
+    brand.innerHTML = '<div class="sidebar-brand-mark">Q</div><div class="sidebar-brand-text">Quiz Portal</div>';
+    side.appendChild(brand);
 
-    var user = currentUser();
+    var nav = document.createElement('nav');
+    nav.className = 'sidebar-nav';
+    var label = document.createElement('div');
+    label.className = 'sidebar-section-label';
+    label.textContent = 'Navigation';
+    nav.appendChild(label);
 
+    var items;
     if(user.role === 'Admin'){
       var pendingCount = state.data.disputes.filter(function(d){return d.status==='pending';}).length;
-      var adminDestinations = [
-        ['users','User Accounts'],['teams','Teams'],['quizmgmt','Quiz Management'],
-        ['disputes','Disputes', pendingCount],['knowledge','Knowledge Updates'],
-        ['reports','Reports'],['audit','Audit Log'],['backup','Backup & Restore']
+      items = [
+        ['users','User Accounts','users'],['teams','Teams','teams'],['quizmgmt','Quiz Management','quizmgmt'],
+        ['disputes','Disputes','disputes',pendingCount],['knowledge','Knowledge Updates','knowledge'],
+        ['reports','Reports','reports'],['audit','Audit Log','audit'],['backup','Backup & Restore','backup']
       ];
-      var menuWrap = document.createElement('div');
-      menuWrap.className = 'admin-menu-wrap';
-      var menuBtn = document.createElement('button');
-      menuBtn.type = 'button'; menuBtn.className = 'admin-menu-btn'; menuBtn.innerHTML = '&#8942;';
-      menuBtn.title = 'Admin menu';
-      var panel = document.createElement('div');
-      panel.className = 'admin-menu-panel' + (state.adminMenuOpen ? ' open' : '');
-      adminDestinations.forEach(function(d){
-        var item = document.createElement('div');
-        item.className = 'admin-menu-item' + (state.tab===d[0] ? ' active' : '');
-        item.innerHTML = '<span>'+d[1]+'</span>' + (d[2] ? '<span class="admin-menu-badge">'+d[2]+'</span>' : '');
-        item.onclick = function(){
-          state.tab = d[0];
-          state.editingUserId=null; state.editingQuestionId=null; state.editingQuizId=null; state.editingKuId=null; state.viewingQuestionAuditId=null; state.kuMode='list';
-          state.adminMenuOpen = false;
-          render();
-        };
-        panel.appendChild(item);
-      });
-      menuBtn.onclick = function(e){
-        e.stopPropagation();
-        state.adminMenuOpen = !state.adminMenuOpen;
-        render();
-      };
-      menuWrap.appendChild(menuBtn);
-      menuWrap.appendChild(panel);
-      bar.appendChild(menuWrap);
-      if(state.adminMenuOpen){
-        setTimeout(function(){
-          document.addEventListener('click', function closeOnce(){
-            state.adminMenuOpen = false; render();
-            document.removeEventListener('click', closeOnce);
-          }, {once:true});
-        }, 0);
-      }
+    }else if(user.role === 'Team Leader'){
+      items = [['teamdash','Team Dashboard','teamdash'],['password','Change Password','password']];
+    }else if(user.role === 'Management'){
+      items = [['reports','Reports','reports']];
+    }else{
+      items = [['quiz','Take Quiz','quiz'],['history','My History','history'],['password','Change Password','password']];
     }
 
-    var initials = user.name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
-    var userWrap = document.createElement('div');
-    userWrap.className = 'top-user';
-    var avatarHtml = user.photo ? '<img src="'+user.photo+'">' : initials;
-    userWrap.innerHTML =
-      '<div class="avatar">'+avatarHtml+'</div>'+
-      '<div>'+escapeHtml(user.name)+'<span class="role-pill">'+user.role+(user.team?' \u00b7 '+escapeHtml(user.team):'')+'</span></div>';
-    var logoutBtn = document.createElement('button');
-    logoutBtn.className = 'logout-btn';
-    logoutBtn.textContent = 'Log out';
-    logoutBtn.onclick = function(){
-      state.currentUserId = null;
-      sessionSet(SESSION_KEY, '');
+    items.forEach(function(d){
+      var item = document.createElement('button');
+      item.type='button'; item.className='sidebar-item'+(state.tab===d[0]?' active':'');
+      item.title = d[1];
+      item.setAttribute('aria-label',d[1]);
+      item.innerHTML = '<span class="sidebar-icon">'+sidebarIconSvg(d[2])+'</span><span class="sidebar-label">'+escapeHtml(d[1])+'</span>'+(d[3]?'<span class="sidebar-badge">'+d[3]+'</span>':'');
+      item.onclick=function(){
+        state.tab=d[0]; state.editingUserId=null; state.editingQuestionId=null; state.editingQuizId=null; state.editingKuId=null; state.viewingQuestionAuditId=null; state.kuMode='list';
+        var ov=document.getElementById('mobileSidebarOverlay');
+        if(ov){ov.classList.remove('open');}
+        side.classList.remove('mobile-open');
+        render();
+      };
+      nav.appendChild(item);
+    });
+    side.appendChild(nav);
+
+    var footer=document.createElement('div'); footer.className='sidebar-footer';
+    var toggle=document.createElement('button'); toggle.type='button'; toggle.className='sidebar-toggle';
+    toggle.setAttribute('aria-label',state.sidebarCollapsed?'Open sidebar':'Hide sidebar');
+    toggle.innerHTML=(state.sidebarCollapsed?'▶':'◀')+' <span>'+(state.sidebarCollapsed?'Open':'Hide')+'</span>';
+    toggle.onclick=function(){
+      state.sidebarCollapsed=!state.sidebarCollapsed;
+      localStorage.setItem('quiz_sidebar_collapsed',state.sidebarCollapsed?'1':'0');
       render();
     };
-    userWrap.appendChild(logoutBtn);
-    bar.appendChild(userWrap);
+    footer.appendChild(toggle); side.appendChild(footer);
+    return side;
+  }
+
+  /* ================= TOP BAR ================= */
+  function renderTopbar(){
+    var bar=document.createElement('div'); bar.className='topbar';
+    var menu=document.createElement('button'); menu.type='button'; menu.className='topbar-toggle'; menu.innerHTML='☰'; menu.title='Open navigation';
+    menu.onclick=function(){
+      if(window.innerWidth<=900){
+        var side=document.querySelector('.sidebar'); var ov=document.getElementById('mobileSidebarOverlay');
+        if(side){side.classList.toggle('mobile-open');}
+        if(ov){ov.classList.toggle('open');}
+      }else{
+        state.sidebarCollapsed=!state.sidebarCollapsed;
+        localStorage.setItem('quiz_sidebar_collapsed',state.sidebarCollapsed?'1':'0'); render();
+      }
+    };
+    bar.appendChild(menu);
+
+    var user=currentUser();
+    var userWrap=document.createElement('div'); userWrap.className='top-user';
+    var initials=user.name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+    var avatarHtml=user.photo?'<img src="'+user.photo+'">':initials;
+    userWrap.innerHTML='<div class="avatar">'+avatarHtml+'</div><div>'+escapeHtml(user.name)+'<span class="role-pill">'+escapeHtml(user.role)+'</span></div>';
+    var logoutBtn=document.createElement('button'); logoutBtn.className='logout-btn'; logoutBtn.textContent='Log out';
+    logoutBtn.onclick=function(){state.currentUserId=null;sessionSet(SESSION_KEY,'');render();};
+    userWrap.appendChild(logoutBtn); bar.appendChild(userWrap);
     return bar;
   }
 
