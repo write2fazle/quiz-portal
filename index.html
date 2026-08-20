@@ -347,7 +347,8 @@ table.data-table tr:last-child td{border-bottom:none;}
       userCompletedQuizzes: {},
       userLogins: {},
       knowledgeUpdates: [],
-      userSeenKnowledgeUpdates: {}
+      userSeenKnowledgeUpdates: {},
+      userKnowledgeDashboardViews: {}
     };
   }
 
@@ -383,7 +384,7 @@ table.data-table tr:last-child td{border-bottom:none;}
   };
 
   var SESSION_KEY = 'quiz-portal-session-v1';
-  var SYNC_KEYS = ['teams','users','questionBank','quizzes','quizAttempts','disputes','knowledgeUpdates','teamUsedQuestionIds','userCompletedQuizzes','userSeenKnowledgeUpdates','userLogins'];
+  var SYNC_KEYS = ['teams','users','questionBank','quizzes','quizAttempts','disputes','knowledgeUpdates','teamUsedQuestionIds','userCompletedQuizzes','userSeenKnowledgeUpdates','userKnowledgeDashboardViews','userLogins'];
 
   // Session token only (which user is currently logged in on THIS device) —
   // fine to keep in the browser's own localStorage. No real data lives here,
@@ -514,6 +515,7 @@ table.data-table tr:last-child td{border-bottom:none;}
       teamUsedQuestionIds: meta.teamUsedQuestionIds || {},
       userCompletedQuizzes: meta.userCompletedQuizzes || {},
       userSeenKnowledgeUpdates: meta.userSeenKnowledgeUpdates || {},
+      userKnowledgeDashboardViews: meta.userKnowledgeDashboardViews || {},
       userLogins: meta.userLogins || {}
     };
     return JSON.stringify(out);
@@ -548,6 +550,36 @@ table.data-table tr:last-child td{border-bottom:none;}
       headers:{'Prefer':'resolution=merge-duplicates,return=representation'},
       body:JSON.stringify(rows)
     });
+  }
+
+  async function saveQuizAttemptDirect(attempt){
+    if(!attempt || !attempt.userId || !attempt.quizId) throw new Error('Invalid quiz attempt payload.');
+    var row = {id: attempt.id, data: JSON.stringify(attempt), created_at: new Date().toISOString(), updated_at: new Date().toISOString()};
+    try{
+      await supaRequest(supaUrl('quiz_attempts'), {
+        method:'POST',
+        headers:{'Prefer':'return=representation'},
+        body:JSON.stringify(row)
+      });
+    }catch(firstError){
+      // Some installations use a database-generated UUID for id. Retry once
+      // without sending the client-generated short id; the attempt id is still
+      // preserved inside data and is restored by readJsonCollection().
+      var rowNoId = {data: JSON.stringify(attempt), created_at: row.created_at, updated_at: row.updated_at};
+      try{
+        var inserted = await supaRequest(supaUrl('quiz_attempts'), {
+          method:'POST',
+          headers:{'Prefer':'return=representation'},
+          body:JSON.stringify(rowNoId)
+        });
+        if(inserted && inserted[0] && inserted[0].id) attempt.dbRowId = inserted[0].id;
+      }catch(secondError){
+        throw new Error('Quiz result could not be saved to Supabase. First: '+firstError.message+' | Retry: '+secondError.message);
+      }
+    }
+    // The POST response is the save confirmation. Do not make the user wait
+    // for a second Supabase round-trip just to verify the same insert.
+    return true;
   }
 
   async function remoteQuizAttemptExists(userId, quizId){
@@ -627,7 +659,7 @@ table.data-table tr:last-child td{border-bottom:none;}
       else if(key === 'quizAttempts') await upsertQuizAttempts(payloadObj[key]);
       else if(key === 'disputes') await upsertJsonCollection('disputes', payloadObj[key]);
       else if(key === 'knowledgeUpdates') await upsertJsonCollection('knowledge_updates', payloadObj[key]);
-      else if(key === 'teamUsedQuestionIds' || key === 'userCompletedQuizzes' || key === 'userSeenKnowledgeUpdates' || key === 'userLogins'){
+      else if(key === 'teamUsedQuestionIds' || key === 'userCompletedQuizzes' || key === 'userSeenKnowledgeUpdates' || key === 'userKnowledgeDashboardViews' || key === 'userLogins'){
         await saveMetaKey(key, payloadObj[key]);
       }
     }
@@ -651,6 +683,7 @@ table.data-table tr:last-child td{border-bottom:none;}
     if(!d.userLogins) d.userLogins = {};
     if(!d.knowledgeUpdates) d.knowledgeUpdates = [];
     if(!d.userSeenKnowledgeUpdates) d.userSeenKnowledgeUpdates = {};
+    if(!d.userKnowledgeDashboardViews) d.userKnowledgeDashboardViews = {};
     if(!d.users) d.users = [];
     if(!d.questionBank) d.questionBank = [];
     d.questionBank.forEach(function(q){
@@ -744,26 +777,21 @@ table.data-table tr:last-child td{border-bottom:none;}
         changedKeys.forEach(function(k){ payload[k] = state.data[k]; });
         await gsSaveChanged(payload);
       }
-      // Pick up anything OTHER sessions saved in the meantime, for every
-      // collection this save didn't just touch.
-      var raw = await gsGetAllData();
-      if(raw){
-        var fresh = null;
-        try{ fresh = JSON.parse(raw); }catch(e){ fresh = null; }
-        if(fresh){
-          SYNC_KEYS.forEach(function(k){
-            if(changedKeys.indexOf(k) === -1) state.data[k] = fresh[k];
-          });
-        }
-      }
+      // Do NOT reload the entire database after every small UI action.
+      // That round-trip was making normal user clicks feel slow. The server
+      // write above is already awaited; keep the local state and mark the
+      // changed collections as synced. Fresh server data is loaded on login
+      // / explicit reload instead.
       state.data = normalizeData(state.data);
-      state.lastSyncedData = JSON.parse(JSON.stringify(state.data));
+      if(!state.lastSyncedData) state.lastSyncedData = {};
+      changedKeys.forEach(function(k){
+        state.lastSyncedData[k] = JSON.parse(JSON.stringify(state.data[k]));
+      });
     }catch(e){
       console.error('saveData error:', e);
     }
     saveInFlight = false;
-    if(savePendingAgain){ savePendingAgain = false; saveData(); }
-    render();
+    if(savePendingAgain){ savePendingAgain = false; setTimeout(saveData, 0); }
   }
   function currentUser(){
     return state.data.users.find(function(u){return u.id===state.currentUserId;});
@@ -2104,10 +2132,18 @@ table.data-table tr:last-child td{border-bottom:none;}
     nextBtn.textContent = isLast ? 'I\u2019ve read this \u2014 continue to dashboard' : 'I\u2019ve read this \u2014 next update';
     nextBtn.onclick = function(){
       if(!state.data.userSeenKnowledgeUpdates[state.currentUserId]) state.data.userSeenKnowledgeUpdates[state.currentUserId] = [];
-      state.data.userSeenKnowledgeUpdates[state.currentUserId].push(k.id);
-      saveData();
+      if(!state.data.userKnowledgeDashboardViews[state.currentUserId]) state.data.userKnowledgeDashboardViews[state.currentUserId] = {};
+      if(state.data.userSeenKnowledgeUpdates[state.currentUserId].indexOf(k.id) === -1){
+        state.data.userSeenKnowledgeUpdates[state.currentUserId].push(k.id);
+        // After the user reads it, the mandatory Read option disappears.
+        // The update itself remains on Dashboard for two dashboard views.
+        state.data.userKnowledgeDashboardViews[state.currentUserId][k.id] = 0;
+      }
+      nextBtn.disabled = true;
+      nextBtn.textContent = 'Saved — opening dashboard…';
       state.kuGateIndex = 0;
       render();
+      setTimeout(saveData, 0);
     };
     card.appendChild(nextBtn);
 
@@ -2119,19 +2155,52 @@ table.data-table tr:last-child td{border-bottom:none;}
     var card = document.createElement('div');
     card.className = 'card';
     card.innerHTML = '<div class="section-title">Daily Updates</div>';
+
+    var userId = state.currentUserId;
     var live = liveKnowledgeUpdates();
-    if(live.length === 0){
-      card.innerHTML += '<div class="empty-note">No updates posted yet.</div>';
+    var seen = state.data.userSeenKnowledgeUpdates[userId] || [];
+    var views = state.data.userKnowledgeDashboardViews[userId] || {};
+
+    // IMPORTANT: unread/new content is NOT shown as a dashboard card.
+    // It is handled by the mandatory read gate first. Once read, the
+    // Read option disappears and the update stays on the dashboard twice.
+    var dashboardItems = live.filter(function(k){
+      return seen.indexOf(k.id) !== -1 && Number(views[k.id] || 0) < 2;
+    });
+
+    if(!dashboardItems.length){
+      card.innerHTML += '<div class="empty-note">No updates to show.</div>';
       return card;
     }
-    live.forEach(function(k){
+
+    if(!state.data.userKnowledgeDashboardViews[userId]) state.data.userKnowledgeDashboardViews[userId] = {};
+    dashboardItems.forEach(function(k){
       var row = document.createElement('div');
       row.className = 'quiz-list-row';
       row.style.cursor = 'pointer';
-      row.innerHTML = '<div><div class="quiz-list-title">'+escapeHtml(k.name)+'</div><div class="quiz-list-meta">'+fmtDateTime(k.startDateTime)+'</div></div>';
-      row.onclick = function(){ state.viewingKuId = k.id; render(); };
+      row.innerHTML = '<div style="width:100%"><div class="quiz-list-title">'+escapeHtml(k.name)+'</div><div class="quiz-list-meta">'+fmtDateTime(k.startDateTime)+'</div></div>';
+      // No Read button here. Read is shown only by the mandatory gate for
+      // genuinely new/unread content.
+      row.onclick = function(){ if(row.dataset.opening==='1') return; row.dataset.opening='1'; state.viewingKuId = k.id; render(); };
       card.appendChild(row);
     });
+
+    // Count a dashboard view once when the dashboard is actually entered,
+    // not every time render() redraws the same dashboard in the same visit.
+    var visitKey = 'quiz-portal-dashboard-visit:' + String(userId) + ':' + String(Date.now());
+    if(!state._knowledgeDashboardVisitId) state._knowledgeDashboardVisitId = uid();
+    var countedKey = 'quiz-portal-ku-counted:' + state._knowledgeDashboardVisitId;
+    var alreadyCounted = {};
+    try{ alreadyCounted = JSON.parse(sessionStorage.getItem(countedKey) || '{}'); }catch(e){}
+    dashboardItems.forEach(function(k){
+      if(!alreadyCounted[k.id]){
+        state.data.userKnowledgeDashboardViews[userId][k.id] = Number(state.data.userKnowledgeDashboardViews[userId][k.id] || 0) + 1;
+        alreadyCounted[k.id] = true;
+      }
+    });
+    try{ sessionStorage.setItem(countedKey, JSON.stringify(alreadyCounted)); }catch(e){}
+    // Persist in the background; do not make dashboard rendering wait on Supabase.
+    if(dashboardItems.length) setTimeout(function(){ saveData(); }, 0);
     return card;
   }
 
@@ -2596,14 +2665,13 @@ table.data-table tr:last-child td{border-bottom:none;}
     card.className = 'card';
     card.innerHTML = '<div class="section-title">Available quizzes for '+escapeHtml(user.team)+'</div>';
 
-    var completed = state.data.userCompletedQuizzes[state.currentUserId] || [];
-    // Local completion markers are a safety net for the same browser session.
-    // Supabase quiz_attempts remains the authoritative cross-device source.
-    state.data.quizzes.forEach(function(q){
-      if(localCompletionExists(state.currentUserId, q.id) && completed.indexOf(q.id) === -1){
-        completed.push(q.id);
-      }
-    });
+    // IMPORTANT: quiz_attempts is the ONLY source of truth for the no-retake
+    // rule. Do not use localStorage or userCompletedQuizzes meta here.
+    // Therefore, if an Admin deletes a user's attempt from Supabase,
+    // that quiz becomes available again after the next data refresh/login.
+    var completed = (state.data.quizAttempts || []).filter(function(a){
+      return a && a.userId === state.currentUserId;
+    }).map(function(a){ return a.quizId; });
     var available = state.data.quizzes.filter(function(q){
       return q.team === user.team &&
              quizStatus(q) !== 'off' &&
@@ -2628,7 +2696,7 @@ table.data-table tr:last-child td{border-bottom:none;}
           actionBtn.className = 'btn secondary small'; actionBtn.textContent = 'Scheduled'; actionBtn.disabled = true;
         }else{
           actionBtn.className = 'btn primary small'; actionBtn.textContent = 'Start quiz';
-          actionBtn.onclick = function(){ openQuiz(quiz); };
+          actionBtn.onclick = function(){ if(actionBtn.dataset.busy==='1') return; actionBtn.dataset.busy='1'; openQuiz(quiz).finally(function(){ actionBtn.dataset.busy='0'; }); };
         }
         row.appendChild(actionBtn);
         card.appendChild(row);
@@ -2835,17 +2903,9 @@ table.data-table tr:last-child td{border-bottom:none;}
   /* ================= QUIZ TAKING ================= */
   async function openQuiz(quiz){
     var userId = state.currentUserId;
-    var alreadyAttempted = localCompletionExists(userId, quiz.id) || (state.data.quizAttempts || []).some(function(attempt){
-      return attempt && attempt.userId === userId && attempt.quizId === quiz.id;
-    });
-    if(!alreadyAttempted){
-      alreadyAttempted = await remoteQuizAttemptExists(userId, quiz.id);
-      if(alreadyAttempted){
-        markLocalCompletion(userId, quiz.id);
-        if(!state.data.userCompletedQuizzes[userId]) state.data.userCompletedQuizzes[userId] = [];
-        if(state.data.userCompletedQuizzes[userId].indexOf(quiz.id) === -1) state.data.userCompletedQuizzes[userId].push(quiz.id);
-      }
-    }
+    // Supabase quiz_attempts is authoritative. If the DB row was deleted,
+    // the quiz must be allowed again even if an old local/meta completion flag exists.
+    var alreadyAttempted = await remoteQuizAttemptExists(userId, quiz.id);
     if(alreadyAttempted){
       notify('You have already completed this quiz.','error');
       return;
@@ -2924,7 +2984,14 @@ table.data-table tr:last-child td{border-bottom:none;}
         var b = document.createElement('button');
         b.className = 'quiz-option' + (qs.selections[qs.index]===i ? ' selected' : '');
         b.textContent = opt;
-        b.onclick = function(){ qs.selections[qs.index] = i; render(); };
+        b.onclick = function(){
+          qs.selections[qs.index] = i;
+          var opts = box.querySelectorAll('.quiz-option');
+          opts.forEach(function(el, idx){ el.classList.toggle('selected', idx === i); });
+          dots.querySelectorAll('.quiz-dot').forEach(function(el, idx){
+            if(idx === qs.index) el.classList.add('answered');
+          });
+        };
         box.appendChild(b);
       });
 
@@ -2946,7 +3013,9 @@ table.data-table tr:last-child td{border-bottom:none;}
           if(unanswered > 0){
             if(!confirm(unanswered + ' question(s) are still unanswered. Submit anyway?')) return;
           }
-          finishQuiz();
+          nextBtn.disabled = true;
+          nextBtn.textContent = 'Submitting...';
+          finishQuiz().finally(function(){ if(state.quizSession && !state.quizSession.done) { nextBtn.disabled=false; nextBtn.textContent='Submit quiz'; } });
         }else{
           qs.index += 1; render();
         }
@@ -2961,7 +3030,10 @@ table.data-table tr:last-child td{border-bottom:none;}
       submitNowBtn.onclick = function(){
         var unanswered = qs.questions.length - Object.keys(qs.selections).length;
         var msg = unanswered > 0 ? unanswered + ' question(s) are still unanswered. Submit anyway?' : 'Submit the quiz now?';
-        if(confirm(msg)) finishQuiz();
+        if(!confirm(msg)) return;
+        submitNowBtn.disabled = true;
+        submitNowBtn.textContent = 'Submitting...';
+        finishQuiz().finally(function(){ if(state.quizSession && !state.quizSession.done) { submitNowBtn.disabled=false; submitNowBtn.textContent='Submit quiz now'; } });
       };
       box.appendChild(submitNowBtn);
     }else{
@@ -3003,14 +3075,10 @@ table.data-table tr:last-child td{border-bottom:none;}
     var user = currentUser();
 
     // Prevent duplicate submission using the locally loaded attempts.
-    var duplicateAttempt = localCompletionExists(state.currentUserId, qs.quiz.id) || (state.data.quizAttempts || []).some(function(attempt){
-      return attempt && attempt.userId === state.currentUserId && attempt.quizId === qs.quiz.id;
-    });
-    if(!duplicateAttempt){
-      duplicateAttempt = await remoteQuizAttemptExists(state.currentUserId, qs.quiz.id);
-    }
+    // Final no-retake check is also DB-authoritative. Deleting the attempt
+    // from Supabase therefore immediately removes the block.
+    var duplicateAttempt = await remoteQuizAttemptExists(state.currentUserId, qs.quiz.id);
     if(duplicateAttempt){
-      markLocalCompletion(state.currentUserId, qs.quiz.id);
       qs.done = true;
       state.quizSession = null;
       notify('You have already completed this quiz.','error');
@@ -3039,25 +3107,37 @@ table.data-table tr:last-child td{border-bottom:none;}
       score: score, total: qs.questions.length, date: new Date().toISOString().slice(0,10),
       finishedAt: Date.now(), answers: answers
     };
-    // Mark locally BEFORE leaving the quiz so a refresh cannot offer it again.
-    markLocalCompletion(state.currentUserId, qs.quiz.id);
-    state.data.quizAttempts.push(attempt);
-    if(!state.data.userCompletedQuizzes[state.currentUserId]) state.data.userCompletedQuizzes[state.currentUserId] = [];
-    if(state.data.userCompletedQuizzes[state.currentUserId].indexOf(qs.quiz.id) === -1){
-      state.data.userCompletedQuizzes[state.currentUserId].push(qs.quiz.id);
-    }
-    qs.attemptId = attempt.id;
-    qs.finalScore = score;
-    qs.done = true;
+    // IMPORTANT: save to Supabase first. Only after the database confirms the
+    // attempt exists do we mark the quiz complete locally and show the result.
     try{
-      await saveData();
+      await saveQuizAttemptDirect(attempt);
+
+      if(!state.data.quizAttempts.some(function(a){ return a && a.id === attempt.id; })){
+        state.data.quizAttempts.push(attempt);
+      }
+      if(!state.data.userCompletedQuizzes[state.currentUserId]) state.data.userCompletedQuizzes[state.currentUserId] = [];
+      if(state.data.userCompletedQuizzes[state.currentUserId].indexOf(qs.quiz.id) === -1){
+        state.data.userCompletedQuizzes[state.currentUserId].push(qs.quiz.id);
+      }
+      markLocalCompletion(state.currentUserId, qs.quiz.id);
+      // Persist the completion index separately; quiz_attempts itself is already
+      // verified above, so a meta write failure cannot erase the real attempt.
+      try{ await saveMetaKey('userCompletedQuizzes', state.data.userCompletedQuizzes); }catch(metaErr){ console.warn('Completion index save failed:', metaErr); }
+
+      qs.attemptId = attempt.id;
+      qs.finalScore = score;
+      qs.done = true;
+      qs.submitted = true;
+      state.quizSession = null;
+      state.tab = 'history';
+      render();
+      notify('Quiz submitted successfully. Your result has been saved.','success');
     }catch(e){
       console.error('Quiz completion persistence error:', e);
-      notify('Quiz completed. The local no-retake lock is active; please contact Admin if your result is missing.','error');
+      qs.done = false;
+      notify('Quiz result was NOT saved. Please try Submit again. '+e.message,'error');
+      render();
     }
-    state.quizSession = null;
-    state.tab = 'history';
-    render();
   }
 
   loadData();
