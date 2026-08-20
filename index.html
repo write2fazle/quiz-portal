@@ -2553,7 +2553,11 @@ table.data-table tr:last-child td{border-bottom:none;}
     card.className = 'card';
     card.innerHTML = '<div class="section-title">Available quizzes for '+escapeHtml(user.team)+'</div>';
 
-    var completed = state.data.userCompletedQuizzes[state.currentUserId] || [];
+    // Never show a quiz again after the current user has completed it.
+    // Read completion from BOTH quiz_attempts and the completion index so the
+    // no-retake rule remains reliable after refresh/re-login and even if the
+    // meta completion index is rebuilt from historical attempts.
+    var completed = getCompletedQuizIds(state.currentUserId);
     var available = state.data.quizzes.filter(function(q){
       return q.team === user.team &&
              quizStatus(q) !== 'off' &&
@@ -2783,11 +2787,28 @@ table.data-table tr:last-child td{border-bottom:none;}
   }
 
   /* ================= QUIZ TAKING ================= */
+  function getCompletedQuizIds(userId){
+    var completed = [];
+    (state.data.quizAttempts || []).forEach(function(attempt){
+      if(attempt && attempt.userId === userId && attempt.quizId && completed.indexOf(attempt.quizId) === -1){
+        completed.push(attempt.quizId);
+      }
+    });
+    var metaCompleted = (state.data.userCompletedQuizzes && state.data.userCompletedQuizzes[userId]) || [];
+    metaCompleted.forEach(function(quizId){
+      if(quizId && completed.indexOf(quizId) === -1) completed.push(quizId);
+    });
+    return completed;
+  }
+
+  function hasCompletedQuiz(userId, quizId){
+    if(!userId || !quizId) return false;
+    return getCompletedQuizIds(userId).indexOf(quizId) !== -1;
+  }
+
   function openQuiz(quiz){
     var userId = state.currentUserId;
-    var alreadyAttempted = (state.data.quizAttempts || []).some(function(attempt){
-      return attempt && attempt.userId === userId && attempt.quizId === quiz.id;
-    });
+    var alreadyAttempted = hasCompletedQuiz(userId, quiz.id);
     if(alreadyAttempted){
       notify('You have already completed this quiz.','error');
       return;
@@ -2945,9 +2966,7 @@ table.data-table tr:last-child td{border-bottom:none;}
     var user = currentUser();
 
     // Prevent duplicate submission using the locally loaded attempts.
-    var duplicateAttempt = (state.data.quizAttempts || []).some(function(attempt){
-      return attempt && attempt.userId === state.currentUserId && attempt.quizId === qs.quiz.id;
-    });
+    var duplicateAttempt = hasCompletedQuiz(state.currentUserId, qs.quiz.id);
     if(duplicateAttempt){
       qs.done = true;
       state.quizSession = null;
@@ -2971,6 +2990,31 @@ table.data-table tr:last-child td{border-bottom:none;}
         isCorrect: isCorrect
       };
     });
+    // Re-check immediately before writing the attempt. This prevents a second
+    // submission if the same user completed the quiz in another tab/session
+    // while this quiz window was open.
+    try{
+      var latestRaw = await gsGetAllData();
+      if(latestRaw){
+        var latest = null;
+        try{ latest = normalizeData(JSON.parse(latestRaw)); }catch(e){ latest = null; }
+        if(latest){
+          var latestCompleted = (latest.quizAttempts || []).some(function(a){
+            return a && a.userId === state.currentUserId && a.quizId === qs.quiz.id;
+          }) || ((latest.userCompletedQuizzes[state.currentUserId] || []).indexOf(qs.quiz.id) !== -1);
+          if(latestCompleted){
+            qs.done = true;
+            state.quizSession = null;
+            notify('You have already completed this quiz.','error');
+            render();
+            return;
+          }
+        }
+      }
+    }catch(e){
+      console.warn('Final no-retake verification skipped:', e);
+    }
+
     var attempt = {
       id: uid(), quizId: qs.quiz.id, quizTitle: qs.quiz.title, quizDate: qs.quiz.scheduledDate,
       userId: state.currentUserId, userName: user.name, userEmail: user.email, team: user.team,
