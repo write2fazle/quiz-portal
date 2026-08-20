@@ -525,11 +525,54 @@ table.data-table tr:last-child td{border-bottom:none;}
       return {id: item.id || uid(), data: JSON.stringify(item), updated_at: new Date().toISOString()};
     });
 
-    // Replace the collection so deletions made in the portal are reflected.
+    // Replace normal portal collections so deletes are reflected.
+    // quiz_attempts is intentionally handled by upsertQuizAttempts() below:
+    // deleting the whole attempts table on every submission can make a
+    // completed quiz disappear after refresh if an RLS/insert request fails.
     await supaRequest(supaUrl(table, '?id=not.is.null'), {method:'DELETE'});
     if(rows.length){
       await supaRequest(supaUrl(table), {method:'POST', body: JSON.stringify(rows)});
     }
+  }
+
+  async function upsertQuizAttempts(items){
+    items = items || [];
+    if(!items.length) return;
+    var rows = items.map(function(item){
+      return {id: item.id || uid(), data: JSON.stringify(item), updated_at: new Date().toISOString()};
+    });
+    // Never delete quiz_attempts. A completed attempt must remain durable
+    // across refresh/re-login. Merge by id instead of replacing the table.
+    await supaRequest(supaUrl('quiz_attempts') + '?on_conflict=id', {
+      method:'POST',
+      headers:{'Prefer':'resolution=merge-duplicates,return=representation'},
+      body:JSON.stringify(rows)
+    });
+  }
+
+  async function remoteQuizAttemptExists(userId, quizId){
+    if(!userId || !quizId) return false;
+    try{
+      var q = '?select=id,data&data->>userId=eq.' + encodeURIComponent(userId) +
+              '&data->>quizId=eq.' + encodeURIComponent(quizId) + '&limit=1';
+      var rows = await supaRequest(supaUrl('quiz_attempts', q));
+      return !!(rows && rows.length);
+    }catch(e){
+      console.warn('Remote no-retake check failed:', e);
+      return false;
+    }
+  }
+
+  function completionStorageKey(userId, quizId){
+    return 'quiz-portal-completed-v2:' + String(userId || '') + ':' + String(quizId || '');
+  }
+
+  function localCompletionExists(userId, quizId){
+    try{ return localStorage.getItem(completionStorageKey(userId, quizId)) === '1'; }catch(e){ return false; }
+  }
+
+  function markLocalCompletion(userId, quizId){
+    try{ localStorage.setItem(completionStorageKey(userId, quizId), '1'); }catch(e){}
   }
 
   async function saveTeams(items){
@@ -581,7 +624,7 @@ table.data-table tr:last-child td{border-bottom:none;}
       else if(key === 'users') await saveUsers(payloadObj[key]);
       else if(key === 'questionBank') await upsertJsonCollection('question_bank', payloadObj[key]);
       else if(key === 'quizzes') await upsertJsonCollection('quizzes', payloadObj[key]);
-      else if(key === 'quizAttempts') await upsertJsonCollection('quiz_attempts', payloadObj[key]);
+      else if(key === 'quizAttempts') await upsertQuizAttempts(payloadObj[key]);
       else if(key === 'disputes') await upsertJsonCollection('disputes', payloadObj[key]);
       else if(key === 'knowledgeUpdates') await upsertJsonCollection('knowledge_updates', payloadObj[key]);
       else if(key === 'teamUsedQuestionIds' || key === 'userCompletedQuizzes' || key === 'userSeenKnowledgeUpdates' || key === 'userLogins'){
@@ -2553,11 +2596,14 @@ table.data-table tr:last-child td{border-bottom:none;}
     card.className = 'card';
     card.innerHTML = '<div class="section-title">Available quizzes for '+escapeHtml(user.team)+'</div>';
 
-    // Never show a quiz again after the current user has completed it.
-    // Read completion from BOTH quiz_attempts and the completion index so the
-    // no-retake rule remains reliable after refresh/re-login and even if the
-    // meta completion index is rebuilt from historical attempts.
-    var completed = getCompletedQuizIds(state.currentUserId);
+    var completed = state.data.userCompletedQuizzes[state.currentUserId] || [];
+    // Local completion markers are a safety net for the same browser session.
+    // Supabase quiz_attempts remains the authoritative cross-device source.
+    state.data.quizzes.forEach(function(q){
+      if(localCompletionExists(state.currentUserId, q.id) && completed.indexOf(q.id) === -1){
+        completed.push(q.id);
+      }
+    });
     var available = state.data.quizzes.filter(function(q){
       return q.team === user.team &&
              quizStatus(q) !== 'off' &&
@@ -2787,28 +2833,19 @@ table.data-table tr:last-child td{border-bottom:none;}
   }
 
   /* ================= QUIZ TAKING ================= */
-  function getCompletedQuizIds(userId){
-    var completed = [];
-    (state.data.quizAttempts || []).forEach(function(attempt){
-      if(attempt && attempt.userId === userId && attempt.quizId && completed.indexOf(attempt.quizId) === -1){
-        completed.push(attempt.quizId);
-      }
-    });
-    var metaCompleted = (state.data.userCompletedQuizzes && state.data.userCompletedQuizzes[userId]) || [];
-    metaCompleted.forEach(function(quizId){
-      if(quizId && completed.indexOf(quizId) === -1) completed.push(quizId);
-    });
-    return completed;
-  }
-
-  function hasCompletedQuiz(userId, quizId){
-    if(!userId || !quizId) return false;
-    return getCompletedQuizIds(userId).indexOf(quizId) !== -1;
-  }
-
-  function openQuiz(quiz){
+  async function openQuiz(quiz){
     var userId = state.currentUserId;
-    var alreadyAttempted = hasCompletedQuiz(userId, quiz.id);
+    var alreadyAttempted = localCompletionExists(userId, quiz.id) || (state.data.quizAttempts || []).some(function(attempt){
+      return attempt && attempt.userId === userId && attempt.quizId === quiz.id;
+    });
+    if(!alreadyAttempted){
+      alreadyAttempted = await remoteQuizAttemptExists(userId, quiz.id);
+      if(alreadyAttempted){
+        markLocalCompletion(userId, quiz.id);
+        if(!state.data.userCompletedQuizzes[userId]) state.data.userCompletedQuizzes[userId] = [];
+        if(state.data.userCompletedQuizzes[userId].indexOf(quiz.id) === -1) state.data.userCompletedQuizzes[userId].push(quiz.id);
+      }
+    }
     if(alreadyAttempted){
       notify('You have already completed this quiz.','error');
       return;
@@ -2966,8 +3003,14 @@ table.data-table tr:last-child td{border-bottom:none;}
     var user = currentUser();
 
     // Prevent duplicate submission using the locally loaded attempts.
-    var duplicateAttempt = hasCompletedQuiz(state.currentUserId, qs.quiz.id);
+    var duplicateAttempt = localCompletionExists(state.currentUserId, qs.quiz.id) || (state.data.quizAttempts || []).some(function(attempt){
+      return attempt && attempt.userId === state.currentUserId && attempt.quizId === qs.quiz.id;
+    });
+    if(!duplicateAttempt){
+      duplicateAttempt = await remoteQuizAttemptExists(state.currentUserId, qs.quiz.id);
+    }
     if(duplicateAttempt){
+      markLocalCompletion(state.currentUserId, qs.quiz.id);
       qs.done = true;
       state.quizSession = null;
       notify('You have already completed this quiz.','error');
@@ -2990,44 +3033,28 @@ table.data-table tr:last-child td{border-bottom:none;}
         isCorrect: isCorrect
       };
     });
-    // Re-check immediately before writing the attempt. This prevents a second
-    // submission if the same user completed the quiz in another tab/session
-    // while this quiz window was open.
-    try{
-      var latestRaw = await gsGetAllData();
-      if(latestRaw){
-        var latest = null;
-        try{ latest = normalizeData(JSON.parse(latestRaw)); }catch(e){ latest = null; }
-        if(latest){
-          var latestCompleted = (latest.quizAttempts || []).some(function(a){
-            return a && a.userId === state.currentUserId && a.quizId === qs.quiz.id;
-          }) || ((latest.userCompletedQuizzes[state.currentUserId] || []).indexOf(qs.quiz.id) !== -1);
-          if(latestCompleted){
-            qs.done = true;
-            state.quizSession = null;
-            notify('You have already completed this quiz.','error');
-            render();
-            return;
-          }
-        }
-      }
-    }catch(e){
-      console.warn('Final no-retake verification skipped:', e);
-    }
-
     var attempt = {
       id: uid(), quizId: qs.quiz.id, quizTitle: qs.quiz.title, quizDate: qs.quiz.scheduledDate,
       userId: state.currentUserId, userName: user.name, userEmail: user.email, team: user.team,
       score: score, total: qs.questions.length, date: new Date().toISOString().slice(0,10),
       finishedAt: Date.now(), answers: answers
     };
+    // Mark locally BEFORE leaving the quiz so a refresh cannot offer it again.
+    markLocalCompletion(state.currentUserId, qs.quiz.id);
     state.data.quizAttempts.push(attempt);
     if(!state.data.userCompletedQuizzes[state.currentUserId]) state.data.userCompletedQuizzes[state.currentUserId] = [];
-    state.data.userCompletedQuizzes[state.currentUserId].push(qs.quiz.id);
+    if(state.data.userCompletedQuizzes[state.currentUserId].indexOf(qs.quiz.id) === -1){
+      state.data.userCompletedQuizzes[state.currentUserId].push(qs.quiz.id);
+    }
     qs.attemptId = attempt.id;
     qs.finalScore = score;
     qs.done = true;
-    await saveData();
+    try{
+      await saveData();
+    }catch(e){
+      console.error('Quiz completion persistence error:', e);
+      notify('Quiz completed. The local no-retake lock is active; please contact Admin if your result is missing.','error');
+    }
     state.quizSession = null;
     state.tab = 'history';
     render();
