@@ -297,6 +297,24 @@ table.data-table tr:last-child td{border-bottom:none;}
   .topbar{padding:0 16px;}
   .shell{padding:0 16px 50px;}
 }
+
+/* ===== Profile Cover + Avatar ===== */
+.profile-cover-card{overflow:hidden;padding:0!important;}
+.profile-cover{height:220px;background:#f3f4f6;position:relative;overflow:hidden;}
+.profile-cover img{width:100%;height:100%;object-fit:cover;display:block;}
+.edit-cover-btn{position:absolute;right:18px;top:18px;background:rgba(255,255,255,.95);border:1px solid #E4E7EC;color:#344054;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(16,24,40,.08);}
+.edit-cover-btn:hover{color:#F46B12;border-color:#F46B12;}
+.profile-info-section{position:relative;padding:0 28px 28px;}
+.profile-avatar-wrap{position:relative;width:112px;height:112px;margin-top:-56px;margin-bottom:14px;}
+.profile-avatar-wrap img,.profile-avatar-fallback{width:112px;height:112px;border-radius:50%;object-fit:cover;border:5px solid #fff;box-shadow:0 3px 14px rgba(16,24,40,.14);background:#F46B12;color:#fff;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:700;}
+.edit-avatar-btn{position:absolute;right:-2px;bottom:3px;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#F46B12;color:#fff;border:3px solid #fff;cursor:pointer;font-size:14px;box-shadow:0 2px 7px rgba(16,24,40,.16);}
+.profile-name{font-size:20px;font-weight:700;color:#1D2939;margin:0 0 5px;}
+.profile-meta{font-size:12px;color:#667085;margin:0;}
+.profile-details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:22px;}
+.profile-detail{border:1px solid #EAECF0;border-radius:9px;padding:12px 14px;background:#FCFCFD;}
+.profile-detail-label{font-size:10px;color:#98A2B3;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;}
+.profile-detail-value{font-size:13px;color:#344054;font-weight:600;word-break:break-word;}
+@media(max-width:700px){.profile-cover{height:170px}.profile-info-section{padding:0 18px 22px}.profile-details{grid-template-columns:1fr}.profile-avatar-wrap{width:92px;height:92px;margin-top:-46px}.profile-avatar-wrap img,.profile-avatar-fallback{width:92px;height:92px}}
 </style>
 </head>
 <body>
@@ -462,6 +480,7 @@ table.data-table tr:last-child td{border-bottom:none;}
     reportsStartDate: '',
     reportsEndDate: '',
     viewingAttemptId: null,
+    historyOpenAttemptId: null,
     rememberChecked: true,
     kuMode: 'list',
     editingKuId: null,
@@ -533,6 +552,7 @@ table.data-table tr:last-child td{border-bottom:none;}
       var obj = parseJsonValue(row.data, null);
       if(!obj || typeof obj !== 'object') obj = {id: row.id};
       if(!obj.id) obj.id = row.id;
+      obj.dbRowId = row.id;
       return obj;
     });
   }
@@ -777,16 +797,20 @@ table.data-table tr:last-child td{border-bottom:none;}
     if(!d.users) d.users = [];
     if(!d.questionBank) d.questionBank = [];
     d.questionBank.forEach(function(q){
-      if(!q.acceptedIndexes) q.acceptedIndexes = [q.correctIndex];
+      if(!q.acceptedIndexes) q.acceptedIndexes = [Number(q.correctIndex)];
+      // correctIndex/correctOption remain the ORIGINAL answer. acceptedIndexes is
+      // used only for scoring after a dispute; never overwrite the displayed original answer.
       if(!q.createdBy) q.createdBy = {id:null, name:'Legacy / Unknown', email:''};
       if(q.createdAt === undefined) q.createdAt = null;
       if(q.updatedBy === undefined) q.updatedBy = null;
       if(q.updatedAt === undefined) q.updatedAt = null;
     });
 
-    // Build the completed-quiz index from quiz_attempts every time data loads.
-    // This is the authoritative source, so users who completed a quiz before
-    // the userCompletedQuizzes meta key existed will still be blocked.
+    // NO-RETAKE SOURCE OF TRUTH: public.quiz_attempts only.
+    // userCompletedQuizzes is a legacy/cache meta key. It must NEVER be merged
+    // into the completion map because an Admin can delete an attempt directly
+    // from Supabase. Once that row is deleted, the quiz must become available
+    // again for that user after the next data refresh/login.
     var completedMap = {};
     (d.quizAttempts || []).forEach(function(attempt){
       if(!attempt || !attempt.userId || !attempt.quizId) return;
@@ -794,14 +818,6 @@ table.data-table tr:last-child td{border-bottom:none;}
       if(completedMap[attempt.userId].indexOf(attempt.quizId) === -1){
         completedMap[attempt.userId].push(attempt.quizId);
       }
-    });
-    Object.keys(d.userCompletedQuizzes || {}).forEach(function(userId){
-      if(!completedMap[userId]) completedMap[userId] = [];
-      (d.userCompletedQuizzes[userId] || []).forEach(function(quizId){
-        if(completedMap[userId].indexOf(quizId) === -1){
-          completedMap[userId].push(quizId);
-        }
-      });
     });
     d.userCompletedQuizzes = completedMap;
 
@@ -829,6 +845,21 @@ table.data-table tr:last-child td{border-bottom:none;}
     }else{
       state.data = normalizeData(fresh);
     }
+    // Clear legacy browser completion flags for quizzes that no longer have a
+    // corresponding attempt. These flags are not used to decide availability,
+    // but removing them prevents older versions of the portal from re-blocking
+    // a quiz on the same browser.
+    try{
+      var stalePrefix='quiz-portal-completed-v2:';
+      Object.keys(localStorage).forEach(function(k){
+        if(k.indexOf(stalePrefix)!==0) return;
+        var parts=k.slice(stalePrefix.length).split(':');
+        if(parts.length<2) return;
+        var uid0=parts[0], qid0=parts.slice(1).join(':');
+        var stillExists=(state.data.quizAttempts||[]).some(function(a){return a && a.userId===uid0 && a.quizId===qid0;});
+        if(!stillExists) localStorage.removeItem(k);
+      });
+    }catch(cleanErr){ console.warn('Legacy completion cleanup skipped:',cleanErr); }
     state.lastSyncedData = JSON.parse(JSON.stringify(state.data));
 
     var session = sessionGet(SESSION_KEY);
@@ -1079,27 +1110,69 @@ table.data-table tr:last-child td{border-bottom:none;}
   }
 
   function isAnswerAccepted(question, index){
-    return question.acceptedIndexes.indexOf(index) !== -1;
+    return (question.acceptedIndexes || []).some(function(i){ return Number(i) === Number(index); });
+  }
+
+  // V11.1 FIX: keep the final-answer helper in global scope.
+  // The previous version accidentally declared it inside the dispute resolver,
+  // so leaderboard/history loading could throw: isFinalAnswerAccepted is not defined.
+  function getFinalAcceptedIndexes(question){
+    if(!question) return [];
+    if(Array.isArray(question.acceptedIndexes) && question.acceptedIndexes.length) return question.acceptedIndexes.map(Number);
+    return [Number(question.correctIndex)];
+  }
+  function isFinalAnswerAccepted(question, selectedIndex){
+    return getFinalAcceptedIndexes(question).some(function(i){ return Number(i) === Number(selectedIndex); });
   }
   function recomputeScoresForQuestion(questionId, remarkText){
-    var q = state.data.questionBank.find(function(x){return x.id===questionId;});
-    if(!q) return;
+    var targetQ = state.data.questionBank.find(function(x){return x.id===questionId;});
+    if(!targetQ) return [];
+    var changedAttempts = [];
+
+    // Recalculate every attempt using the correct Question Bank record for
+    // each answer. The previous implementation compared every answer against
+    // the disputed question, which could produce wrong totals.
     state.data.quizAttempts.forEach(function(attempt){
-      attempt.answers.forEach(function(ans){
-        if(ans.questionId !== questionId) return;
-        var shouldBeCorrect = isAnswerAccepted(q, ans.selectedIndex);
-        if(shouldBeCorrect && !ans.isCorrect){
-          ans.isCorrect = true;
+      var answers = attempt.answers || [];
+      var calculated = 0;
+      var changed = false;
+
+      answers.forEach(function(ans){
+        var q = state.data.questionBank.find(function(x){return x.id===ans.questionId;});
+        var accepted = !!(q && isFinalAnswerAccepted(q, ans.selectedIndex));
+        var nextCorrect = accepted;
+        if(ans.isCorrect !== nextCorrect){ ans.isCorrect = nextCorrect; changed = true; }
+        if(q && ans.questionId === questionId && nextCorrect){
           ans.remark = remarkText || 'Marked correct after dispute review';
-          attempt.score += 1;
+          changed = true;
         }
+        if(nextCorrect) calculated += 1;
       });
+
+      if(Number(attempt.score || 0) !== calculated){
+        attempt.score = calculated;
+        changed = true;
+      }
+      if(answers.some(function(a){return a.questionId===questionId;})) changedAttempts.push(attempt);
     });
+    return changedAttempts;
   }
+  function quizStartMs(quiz){
+    if(quiz.startDateTime) return new Date(quiz.startDateTime).getTime();
+    return new Date(quiz.scheduledDate + 'T' + (quiz.scheduledTime||'00:00') + ':00').getTime();
+  }
+  function quizEndMs(quiz){
+    if(quiz.endDateTime) return new Date(quiz.endDateTime).getTime();
+    // Backward compatibility for older quizzes created before Start/End window.
+    return quizStartMs(quiz) + ((parseInt(quiz.durationMinutes,10)||30) * 60000);
+  }
+  function quizResultsPublished(quiz){ return Date.now() >= quizEndMs(quiz); }
   function quizStatus(quiz){
     if(!quiz.enabled) return 'off';
-    var dt = new Date(quiz.scheduledDate + 'T' + (quiz.scheduledTime||'00:00') + ':00');
-    return Date.now() >= dt.getTime() ? 'running' : 'scheduled';
+    var now=Date.now(), start=quizStartMs(quiz), end=quizEndMs(quiz);
+    if(now < start) return 'scheduled';
+    if(now >= end) return 'ended';
+    return 'running';
   }
 
   function isKnowledgeUpdateLive(ku){
@@ -1119,23 +1192,73 @@ table.data-table tr:last-child td{border-bottom:none;}
     liveKnowledgeUpdates().forEach(function(ku){ if(seen.indexOf(ku.id) === -1) seen.push(ku.id); });
     saveData();
   }
-  function leaderboardData(teamFilter){
-    var byUser = {};
-    state.data.quizAttempts.forEach(function(a){
-      if(teamFilter && a.team !== teamFilter) return;
-      if(!byUser[a.userId]) byUser[a.userId] = {score:0, total:0, attempts:0};
-      byUser[a.userId].score += a.score;
-      byUser[a.userId].total += a.total;
-      byUser[a.userId].attempts += 1;
+  /* ================= LEADERBOARD SCORE ENGINE (V11) ================= */
+  // The leaderboard must never trust a stale attempt.score after a dispute.
+  // A resolved dispute changes Question Bank.acceptedIndexes, so the effective
+  // score is derived again from the attempt answers + the current accepted
+  // answer state. The persisted score is still used everywhere else as the
+  // normal source of truth, but the leaderboard is dispute-safe by design.
+  function effectiveAttemptScore(attempt){
+    var answers = Array.isArray(attempt && attempt.answers) ? attempt.answers : [];
+    var correct = 0;
+    answers.forEach(function(ans){
+      var q = state.data.questionBank.find(function(x){return x.id===ans.questionId;});
+      if(q){
+        if(isFinalAnswerAccepted(q, ans.selectedIndex)) correct++;
+        return;
+      }
+      // If the question was removed from the bank, retain the stored marking
+      // from the attempt instead of silently changing historical results.
+      if(ans.isCorrect) correct++;
     });
-    var rows = Object.keys(byUser).map(function(userId){
+    var total = Number(attempt && attempt.total);
+    if(!total || total < answers.length) total = answers.length;
+    return {score:correct,total:total,pct:total ? (correct/total)*100 : 0};
+  }
+
+  function leaderboardData(teamFilter){
+    var bestByUser = {};
+    state.data.quizAttempts.forEach(function(a){
+      var q = state.data.quizzes.find(function(x){return x.id===a.quizId;});
+      if(q && !quizResultsPublished(q)) return;
+      if(teamFilter && String(a.team||'').trim().toLowerCase() !== String(teamFilter||'').trim().toLowerCase()) return;
+
+      // V11 FIX: calculate the leaderboard result from the CURRENT accepted
+      // answers. This immediately reflects an Admin-approved dispute even if
+      // an old/stale score is still present in the attempt record.
+      var effective = effectiveAttemptScore(a);
+      var pct = effective.pct;
+      var existing = bestByUser[a.userId];
+      if(!existing || pct > existing.pct || (pct === existing.pct && effective.score > existing.score) ||
+         (pct === existing.pct && effective.score === existing.score && (a.finishedAt||Infinity) < (existing.finishedAt||Infinity))){
+        bestByUser[a.userId] = {attempt:a,pct:pct,effective:effective};
+      }
+    });
+    var rows = Object.keys(bestByUser).map(function(userId){
       var u = state.data.users.find(function(x){return x.id===userId;});
       if(!u) return null;
-      var agg = byUser[userId];
-      return {user:u, score:agg.score, total:agg.total, pct: agg.total ? Math.round(agg.score/agg.total*100) : 0, attempts:agg.attempts};
+      var item=bestByUser[userId], a=item.attempt, effective=item.effective;
+      return {user:u, score:effective.score, total:effective.total, pct:Math.round(item.pct), attempts:1, finishedAt:a.finishedAt, quizTitle:a.quizTitle};
     }).filter(Boolean);
-    rows.sort(function(a,b){ if(b.pct!==a.pct) return b.pct-a.pct; return b.score-a.score; });
+    rows.sort(function(a,b){ if(b.pct!==a.pct) return b.pct-a.pct; if(b.score!==a.score) return b.score-a.score; return (a.finishedAt||Infinity)-(b.finishedAt||Infinity); });
     return rows;
+  }
+
+  function renderAllTeamsTopPerformersCard(){
+    var card=document.createElement('div'); card.className='card';
+    card.innerHTML='<div class="section-title">Top Performers — All Teams</div><div style="font-size:11px;color:var(--text-mute);margin:-6px 0 14px;">Highest score wins. If scores are tied, the fastest quiz submission wins.</div>';
+    var table=document.createElement('table'); table.className='data-table';
+    table.innerHTML='<tr><th>Team</th><th>Top Performer</th><th>Score</th><th>Quiz</th><th>Submitted</th></tr>';
+    var has=false;
+    state.data.teams.forEach(function(team){
+      var rows=leaderboardData(team); var r=rows[0];
+      var tr=document.createElement('tr');
+      if(r){has=true; tr.innerHTML='<td>'+escapeHtml(team)+'</td><td style="font-weight:600;">'+escapeHtml(r.user.name)+'</td><td>'+r.score+' / '+r.total+' ('+r.pct+'%)</td><td>'+escapeHtml(r.quizTitle||'—')+'</td><td>'+fmtDateTime(r.finishedAt)+'</td>';}
+      else tr.innerHTML='<td>'+escapeHtml(team)+'</td><td colspan="4" style="color:var(--text-mute);">No published quiz result yet</td>';
+      table.appendChild(tr);
+    });
+    if(!state.data.teams.length) card.innerHTML+='<div class="empty-note">No teams found.</div>'; else card.appendChild(table);
+    return card;
   }
 
   /* ================= RENDER ROOT ================= */
@@ -1167,13 +1290,6 @@ table.data-table tr:last-child td{border-bottom:none;}
     shell.className = 'shell';
     workspace.appendChild(shell);
 
-    if(user.role !== 'Admin' && anyUnseenKnowledgeUpdateLive()){
-      shell.appendChild(renderMandatoryKnowledgeGate());
-      layout.appendChild(workspace);
-      root.appendChild(layout);
-      return;
-    }
-
     if(user.role === 'Admin'){
       if(state.tab === 'users') shell.appendChild(renderUserManagement());
       else if(state.tab === 'teams') shell.appendChild(renderTeamManagement());
@@ -1192,9 +1308,9 @@ table.data-table tr:last-child td{border-bottom:none;}
       else if(state.tab === 'password') shell.appendChild(renderChangePassword());
       else shell.appendChild(renderReports(user.team));
     }else{
-      shell.appendChild(renderUserTabs());
       if(state.tab === 'quiz') shell.appendChild(renderUserQuizHome());
       else if(state.tab === 'history') shell.appendChild(renderUserHistory());
+      else if(state.tab === 'profile') shell.appendChild(renderUserProfile());
       else if(state.tab === 'password') shell.appendChild(renderChangePassword());
       else shell.appendChild(renderUserQuizHome());
     }
@@ -1296,7 +1412,7 @@ table.data-table tr:last-child td{border-bottom:none;}
       quizmgmt:'<rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M8 7h8M8 11h8M8 15h5"></path><path d="M16 15l1.2 1.2L20 13.5"></path>',
       disputes:'<path d="M12 3l9 17H3L12 3z"></path><path d="M12 9v4M12 16h.01"></path>',
       knowledge:'<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"></path><path d="M4 5.5v15M8 7h8M8 11h8"></path>',
-      reports:'<path d="M5 20V10M12 20V4M19 20v-7"></path><path d="M3 20h18"></path>',
+      reports:'<path d="M5 20V11M12 20V4M19 20v-7"></path><path d="M3 20h18"></path>',
       audit:'<circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path>',
       backup:'<path d="M4 7h16v13H4z"></path><path d="M8 7V4h8v3M9 12l3-3 3 3M12 9v7"></path>',
       teamdash:'<path d="M4 19V9M10 19V5M16 19v-7M22 19H2"></path>',
@@ -1339,7 +1455,7 @@ table.data-table tr:last-child td{border-bottom:none;}
     }else if(user.role === 'Management'){
       items = [['reports','Reports','reports']];
     }else{
-      items = [['quiz','Take Quiz','quiz'],['history','My History','history'],['password','Change Password','password']];
+      items = [['quiz','Take Quiz','quiz'],['profile','My Profile','profile'],['password','Change Password','password']];
     }
 
     items.forEach(function(d){
@@ -1428,7 +1544,7 @@ table.data-table tr:last-child td{border-bottom:none;}
   function renderUserTabs(){
     var tabs = document.createElement('div');
     tabs.className = 'tabs';
-    [['quiz','Take Quiz'],['history','My History'],['password','Change Password']].forEach(function(t){
+    [['quiz','Take Quiz'],['history','My History'],['profile','My Profile'],['password','Change Password']].forEach(function(t){
       var btn = document.createElement('button');
       btn.className = 'tab-btn' + (state.tab===t[0] ? ' active' : '');
       btn.textContent = t[1];
@@ -1790,8 +1906,10 @@ table.data-table tr:last-child td{border-bottom:none;}
       if(editing ? editing.team===tm : false) op.selected = true;
       teamSel.appendChild(op);
     });
-    var dateInput = document.createElement('input'); dateInput.type='date'; dateInput.value = editing ? editing.scheduledDate : new Date().toISOString().slice(0,10);
-    var timeInput = document.createElement('input'); timeInput.type='time'; timeInput.value = editing ? editing.scheduledTime : '09:00';
+    var startDateInput = document.createElement('input'); startDateInput.type='date'; startDateInput.value = editing ? (editing.startDate || editing.scheduledDate) : new Date().toISOString().slice(0,10);
+    var startTimeInput = document.createElement('input'); startTimeInput.type='time'; startTimeInput.value = editing ? (editing.startTime || editing.scheduledTime || '09:00') : '09:00';
+    var endDateInput = document.createElement('input'); endDateInput.type='date'; endDateInput.value = editing ? (editing.endDate || editing.scheduledDate) : new Date().toISOString().slice(0,10);
+    var endTimeInput = document.createElement('input'); endTimeInput.type='time'; endTimeInput.value = editing ? (editing.endTime || '') : '17:00';
     var durInput = document.createElement('input'); durInput.type='number'; durInput.min='1'; durInput.value = editing ? editing.durationMinutes : 30;
     var countInput = document.createElement('input'); countInput.type='number'; countInput.min='1'; countInput.value = editing ? editing.questionIds.length : 5;
 
@@ -1805,9 +1923,12 @@ table.data-table tr:last-child td{border-bottom:none;}
     grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:14px;';
     grid.appendChild(row('Quiz title', titleInput));
     grid.appendChild(row('Team', teamSel));
-    grid.appendChild(row('Run date', dateInput));
-    grid.appendChild(row('Run time', timeInput));
-    grid.appendChild(row('Duration (minutes, once started)', durInput));
+    grid.appendChild(row('Start date', startDateInput));
+    grid.appendChild(row('Start time', startTimeInput));
+    grid.appendChild(row('End date', endDateInput));
+    grid.appendChild(row('End time', endTimeInput));
+    grid.appendChild(row('Quiz duration (minutes)', durInput));
+    var windowNote=document.createElement('div'); windowNote.style.cssText='grid-column:1/-1;font-size:11px;color:var(--text-mute);margin-top:-6px;margin-bottom:8px;'; windowNote.textContent='Users can enter only inside this Start → End window. Results are published automatically when End Time is reached.'; grid.appendChild(windowNote);
     card.appendChild(grid);
 
     var manualListHolder = document.createElement('div');
@@ -1879,8 +2000,12 @@ table.data-table tr:last-child td{border-bottom:none;}
       if(editing){
         editing.title = titleInput.value.trim();
         editing.team = teamSel.value;
-        editing.scheduledDate = dateInput.value;
-        editing.scheduledTime = timeInput.value;
+        editing.startDate = startDateInput.value; editing.startTime = startTimeInput.value;
+        editing.endDate = endDateInput.value; editing.endTime = endTimeInput.value;
+        editing.scheduledDate = startDateInput.value; editing.scheduledTime = startTimeInput.value;
+        editing.startDateTime = startDateInput.value+'T'+startTimeInput.value+':00';
+        editing.endDateTime = endDateInput.value+'T'+endTimeInput.value+':00';
+        if(new Date(editing.endDateTime).getTime() <= new Date(editing.startDateTime).getTime()){ alert('End date/time must be after the Start date/time.'); return; }
         editing.durationMinutes = parseInt(durInput.value,10) || 30;
         saveData(); state.editingQuizId = null; render();
         return;
@@ -1898,9 +2023,14 @@ table.data-table tr:last-child td{border-bottom:none;}
         var n = Math.min(parseInt(countInput.value,10)||1, avail.length);
         selectedIds = shuffleArr(avail).slice(0, n).map(function(q){return q.id;});
       }
+      var startDateTime=startDateInput.value+'T'+startTimeInput.value+':00';
+      var endDateTime=endDateInput.value+'T'+endTimeInput.value+':00';
+      if(new Date(endDateTime).getTime() <= new Date(startDateTime).getTime()){ alert('End date/time must be after the Start date/time.'); return; }
       var quiz = {
         id: uid(), title: titleInput.value.trim(), team: teamSel.value,
-        scheduledDate: dateInput.value, scheduledTime: timeInput.value,
+        scheduledDate: startDateInput.value, scheduledTime: startTimeInput.value,
+        startDate:startDateInput.value, startTime:startTimeInput.value, endDate:endDateInput.value, endTime:endTimeInput.value,
+        startDateTime:startDateTime, endDateTime:endDateTime,
         durationMinutes: parseInt(durInput.value,10) || 30, enabled: true,
         questionIds: selectedIds, createdAt: Date.now()
       };
@@ -1926,12 +2056,12 @@ table.data-table tr:last-child td{border-bottom:none;}
     }else{
       var table = document.createElement('table');
       table.className = 'data-table';
-      table.innerHTML = '<tr><th>Title</th><th>Team</th><th>Run at</th><th>Questions</th><th>Status</th><th></th></tr>';
+      table.innerHTML = '<tr><th>Title</th><th>Team</th><th>Start</th><th>End</th><th>Questions</th><th>Status</th><th></th></tr>';
       state.data.quizzes.slice().sort(function(a,b){return b.createdAt-a.createdAt;}).forEach(function(quiz){
         var st = quizStatus(quiz);
-        var badge = st==='running' ? '<span class="status-badge running">Running</span>' : st==='scheduled' ? '<span class="status-badge scheduled">Scheduled</span>' : '<span class="status-badge off">Disabled</span>';
+        var badge = st==='running' ? '<span class="status-badge running">Running</span>' : st==='scheduled' ? '<span class="status-badge scheduled">Scheduled</span>' : st==='ended' ? '<span class="status-badge off">Ended</span>' : '<span class="status-badge off">Disabled</span>';
         var tr = document.createElement('tr');
-        tr.innerHTML = '<td>'+escapeHtml(quiz.title)+'</td><td>'+escapeHtml(quiz.team)+'</td><td>'+fmtDate(quiz.scheduledDate)+' '+quiz.scheduledTime+'</td><td>'+quiz.questionIds.length+'</td><td>'+badge+'</td>';
+        tr.innerHTML = '<td>'+escapeHtml(quiz.title)+'</td><td>'+escapeHtml(quiz.team)+'</td><td>'+fmtDate(quiz.startDate||quiz.scheduledDate)+' '+(quiz.startTime||quiz.scheduledTime)+'</td><td>'+fmtDate(quiz.endDate||quiz.scheduledDate)+' '+(quiz.endTime||'')+'</td><td>'+quiz.questionIds.length+'</td><td>'+badge+'</td>';
         var tdA = document.createElement('td');
         tdA.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
         var editBtn = document.createElement('button');
@@ -1958,6 +2088,37 @@ table.data-table tr:last-child td{border-bottom:none;}
     }
     wrap.appendChild(listCard);
     return wrap;
+  }
+
+  /* Prevent duplicate pending disputes for the same attempt/question.
+     Existing duplicate rows are marked as duplicate instead of being shown
+     repeatedly in the Admin queue. */
+  async function cleanupDuplicatePendingDisputes(){
+    var groups = {};
+    (state.data.disputes || []).forEach(function(d){
+      if(d.status !== 'pending') return;
+      var key = String(d.attemptId||'') + '::' + String(d.questionId||'');
+      (groups[key]||(groups[key]=[])).push(d);
+    });
+    var writes=[];
+    Object.keys(groups).forEach(function(key){
+      var arr=groups[key];
+      if(arr.length<2) return;
+      arr.sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
+      // Keep the newest pending dispute; older identical submissions are no
+      // longer actionable and should not keep reappearing in Admin.
+      arr.slice(1).forEach(function(d){
+        d.status='duplicate';
+        d.resolution='duplicate_submission';
+        d.adminNote='Duplicate submission automatically closed.';
+        d.resolvedAt=Date.now();
+        writes.push(supaRequest(supaUrl('disputes')+'?id=eq.'+encodeURIComponent(d.id),{
+          method:'PATCH',headers:{'Prefer':'return=representation'},
+          body:JSON.stringify({data:JSON.stringify(d),updated_at:new Date().toISOString()})
+        }));
+      });
+    });
+    if(writes.length) await Promise.all(writes);
   }
 
   /* ================= DISPUTE MANAGEMENT (admin) ================= */
@@ -2302,11 +2463,12 @@ table.data-table tr:last-child td{border-bottom:none;}
     var seen = state.data.userSeenKnowledgeUpdates[userId] || [];
     var views = state.data.userKnowledgeDashboardViews[userId] || {};
 
-    // IMPORTANT: unread/new content is NOT shown as a dashboard card.
-    // It is handled by the mandatory read gate first. Once read, the
-    // Read option disappears and the update stays on the dashboard twice.
+    // Daily Updates are no longer a login gate. New updates can be opened
+    // from the dashboard. After an update has been read, it is not forced open
+    // on login; it remains accessible from its title/View button and is shown
+    // for at most two dashboard views.
     var dashboardItems = live.filter(function(k){
-      return seen.indexOf(k.id) !== -1 && Number(views[k.id] || 0) < 2;
+      return seen.indexOf(k.id) === -1 || Number(views[k.id] || 0) < 2;
     });
 
     if(!dashboardItems.length){
@@ -2318,12 +2480,22 @@ table.data-table tr:last-child td{border-bottom:none;}
     dashboardItems.forEach(function(k){
       var row = document.createElement('div');
       row.className = 'quiz-list-row';
-      row.style.cursor = 'pointer';
-      row.innerHTML = '<div style="width:100%"><div class="quiz-list-title">'+escapeHtml(k.name)+'</div><div class="quiz-list-meta">'+fmtDateTime(k.startDateTime)+'</div></div>';
-      // No Read button here. Read is shown only by the mandatory gate for
-      // genuinely new/unread content.
-      row.onclick = function(){ if(row.dataset.opening==='1') return; row.dataset.opening='1'; state.viewingKuId = k.id; render(); };
-      card.appendChild(row);
+      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;';
+      var unread = seen.indexOf(k.id) === -1;
+      row.innerHTML = '<div style="flex:1;min-width:0;cursor:pointer"><div class="quiz-list-title">'+escapeHtml(k.name)+'</div><div class="quiz-list-meta">'+fmtDateTime(k.startDateTime)+(unread?' · <b style="color:var(--orange)">New</b>':'')+'</div></div>';
+      var viewBtn=document.createElement('button'); viewBtn.className='btn secondary small'; viewBtn.textContent='View';
+      function openUpdate(){
+        if(row.dataset.opening==='1') return; row.dataset.opening='1';
+        if(seen.indexOf(k.id)===-1){
+          if(!state.data.userSeenKnowledgeUpdates[userId]) state.data.userSeenKnowledgeUpdates[userId]=[];
+          state.data.userSeenKnowledgeUpdates[userId].push(k.id);
+          if(!state.data.userKnowledgeDashboardViews[userId]) state.data.userKnowledgeDashboardViews[userId]={};
+          state.data.userKnowledgeDashboardViews[userId][k.id]=0;
+          setTimeout(saveData,0);
+        }
+        state.viewingKuId=k.id; render();
+      }
+      row.firstElementChild.onclick=openUpdate; viewBtn.onclick=openUpdate; row.appendChild(viewBtn); card.appendChild(row);
     });
 
     // Count a dashboard view once when the dashboard is actually entered,
@@ -2379,7 +2551,7 @@ table.data-table tr:last-child td{border-bottom:none;}
     whyCard.innerHTML =
       '<div class="section-title">Why this matters</div>'+
       '<div style="font-size:13px;line-height:1.7;color:var(--text-dim);">'+
-      'All user accounts, questions, quizzes, and results are automatically synced to a Supabase PostgreSQL database with restricted storage capacity.\u2014 there\u2019s nothing to remember to back up, '+
+      'This portal saves everything (accounts, questions, quizzes, results) automatically to a Google Sheet in your Google Drive \u2014 there\u2019s nothing to remember to back up, '+
       'and it works the same whether you\u2019re logged in normally, on a different device, or in an Incognito window. '+
       'A downloadable .json snapshot is still useful as an extra offline copy, or if you ever want to move this data somewhere else.'+
       '</div>';
@@ -2443,8 +2615,15 @@ table.data-table tr:last-child td{border-bottom:none;}
   /* ================= DISPUTE MANAGEMENT (admin) ================= */
   function renderDisputeManagement(){
     var wrap = document.createElement('div');
-    var pending = state.data.disputes.filter(function(d){return d.status==='pending';});
-    var resolved = state.data.disputes.filter(function(d){return d.status!=='pending';}).sort(function(a,b){return b.resolvedAt-a.resolvedAt;});
+    var rawPending = state.data.disputes.filter(function(d){return d.status==='pending';});
+    var seenPending = {};
+    var pending = rawPending.filter(function(d){
+      var key=String(d.attemptId||'')+'::'+String(d.questionId||'');
+      if(seenPending[key]) return false;
+      seenPending[key]=true;
+      return true;
+    });
+    var resolved = state.data.disputes.filter(function(d){return d.status!=='pending';}).sort(function(a,b){return (b.resolvedAt||0)-(a.resolvedAt||0);});
 
     var pendingCard = document.createElement('div');
     pendingCard.className = 'card';
@@ -2469,25 +2648,183 @@ table.data-table tr:last-child td{border-bottom:none;}
         var btnRow = document.createElement('div');
         btnRow.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
 
-        function resolveDispute(resolution){
-          d.status = 'resolved'; d.resolution = resolution; d.adminNote = noteInput.value.trim(); d.resolvedAt = Date.now();
-          var q = state.data.questionBank.find(function(x){return x.id===d.questionId;});
-          if(q && (resolution === 'disputed_correct' || resolution === 'both_correct')){
-            if(q.acceptedIndexes.indexOf(d.selectedIndex) === -1) q.acceptedIndexes.push(d.selectedIndex);
-            var remarkText = resolution === 'both_correct' ? 'Both answers are accepted as correct for this question.' : 'Your answer was accepted as correct after a dispute review.';
-            recomputeScoresForQuestion(d.questionId, remarkText);
+        async function recalculateAndPersistAllAffectedAttempts(questionId, acceptedIndexes, remarkText){
+          // Always start from the current database state. This prevents stale browser
+          // state from overwriting a score that was changed by another action/user.
+          var rows = await supaRequest(supaUrl('quiz_attempts', '?select=id,data,created_at,updated_at'));
+          var attempts = (rows || []).map(function(row){
+            var a = parseJsonValue(row.data, {});
+            a.dbRowId = row.id;
+            return a;
+          });
+          var accepted = (acceptedIndexes || []).map(function(i){return Number(i);});
+          var affected = attempts.filter(function(a){
+            return (a.answers || []).some(function(ans){return ans.questionId === questionId;});
+          });
+          if(!affected.length) return [];
+
+          var saved = [];
+          for(var i=0;i<affected.length;i++){
+            var attempt = affected[i];
+            var total = 0;
+            (attempt.answers || []).forEach(function(ans){
+              // Recalculate every answer using its question's current accepted answers.
+              var q = state.data.questionBank.find(function(x){return x.id === ans.questionId;});
+              var indexes = q && Array.isArray(q.acceptedIndexes) ? q.acceptedIndexes.map(Number) : [];
+              var correct = indexes.indexOf(Number(ans.selectedIndex)) !== -1;
+              if(ans.questionId === questionId){
+                correct = accepted.indexOf(Number(ans.selectedIndex)) !== -1;
+                if(correct && remarkText) ans.remark = remarkText;
+              }
+              ans.isCorrect = correct;
+              if(correct) total++;
+            });
+            attempt.score = total;
+            if(!attempt.total) attempt.total = (attempt.answers || []).length;
+
+            var payload = {data:JSON.stringify(attempt), updated_at:new Date().toISOString()};
+            var updated = await supaRequest(supaUrl('quiz_attempts')+'?id=eq.'+encodeURIComponent(attempt.dbRowId), {
+              method:'PATCH',
+              headers:{'Prefer':'return=representation'},
+              body:JSON.stringify(payload)
+            });
+            // Some deployments expose a generated UUID in the table id while the
+            // stable application attempt id lives inside data.id/attemptId. If the
+            // first PATCH affected no row, retry using the embedded attempt id.
+            if(!updated || !updated.length){
+              var embeddedId = attempt.id || attempt.attemptId;
+              if(embeddedId){
+                updated = await supaRequest(supaUrl('quiz_attempts')+'?or=(data->>id.eq.'+encodeURIComponent(embeddedId)+',data->>attemptId.eq.'+encodeURIComponent(embeddedId)+')', {
+                  method:'PATCH',
+                  headers:{'Prefer':'return=representation'},
+                  body:JSON.stringify(payload)
+                });
+              }
+            }
+            if(!updated || !updated.length) throw new Error('Could not update quiz attempt '+attempt.dbRowId+' (score='+attempt.score+').');
+
+            // Read back by BOTH physical row id and embedded application id. Do not
+            // claim success unless the database contains the new score and answer.
+            var verify = await supaRequest(supaUrl('quiz_attempts')+'?select=id,data&id=eq.'+encodeURIComponent(attempt.dbRowId));
+            if(!verify || !verify.length){
+              var embeddedId2 = attempt.id || attempt.attemptId;
+              if(embeddedId2) verify = await supaRequest(supaUrl('quiz_attempts')+'?select=id,data&or=(data->>id.eq.'+encodeURIComponent(embeddedId2)+',data->>attemptId.eq.'+encodeURIComponent(embeddedId2)+')');
+            }
+            if(!verify || !verify.length) throw new Error('Updated attempt could not be verified.');
+            var stored = parseJsonValue(verify[0].data, {});
+            var storedAnswer = (stored.answers || []).find(function(a){return a.questionId===questionId;});
+            var localAnswer = (attempt.answers || []).find(function(a){return a.questionId===questionId;});
+            if(Number(stored.score)!==Number(attempt.score)) throw new Error('Database score verification failed for '+(attempt.userName||attempt.userId));
+            if(storedAnswer && localAnswer && !!storedAnswer.isCorrect!==!!localAnswer.isCorrect) throw new Error('Database answer verification failed for '+(attempt.userName||attempt.userId));
+            saved.push(attempt);
           }
-          saveData(); render();
+          return saved;
+        }
+
+        async function resolveDispute(resolution){
+          var oldStatuses = state.data.disputes.map(function(x){return {id:x.id,status:x.status,resolution:x.resolution,resolvedAt:x.resolvedAt};});
+          var now = Date.now();
+          var q = state.data.questionBank.find(function(x){return x.id===d.questionId;});
+          var affectedDisputes = state.data.disputes.filter(function(x){
+            return x.attemptId === d.attemptId && x.questionId === d.questionId && x.status === 'pending';
+          });
+          if(!affectedDisputes.length) affectedDisputes=[d];
+
+          affectedDisputes.forEach(function(item){
+            item.status='resolved';
+            item.resolution=resolution;
+            item.adminNote=noteInput.value.trim();
+            item.resolvedAt=now;
+            // If Admin accepted the disputed answer, all duplicate pending
+            // dispute records for the same attempt/question are resolved too.
+          });
+
+          var changedAttempts=[];
+          var finalAcceptedIndexes=[];
+          if(q){
+            if(resolution === 'disputed_correct' || resolution === 'both_correct'){
+              q.acceptedIndexes = Array.from(new Set([Number(q.correctIndex), Number(d.selectedIndex)]));
+            }else if(resolution === 'original_correct'){
+              q.acceptedIndexes=[Number(q.correctIndex)];
+            }
+            finalAcceptedIndexes=q.acceptedIndexes.map(Number);
+          }
+
+          try{
+            // Save the dispute decision first.
+            await Promise.all(affectedDisputes.map(function(item){
+              return supaRequest(supaUrl('disputes')+'?id=eq.'+encodeURIComponent(item.dbRowId || item.id), {
+                method:'PATCH', headers:{'Prefer':'return=representation'},
+                body:JSON.stringify({data:JSON.stringify(item),updated_at:new Date().toISOString()})
+              });
+            }));
+
+            // Verify every dispute decision was actually persisted in the database.
+            var disputeVerify = await Promise.all(affectedDisputes.map(function(item){
+              return supaRequest(supaUrl('disputes')+'?select=id,data&id=eq.'+encodeURIComponent(item.dbRowId || item.id));
+            }));
+            disputeVerify.forEach(function(rows, idx){
+              if(!rows || !rows.length) throw new Error('Resolved dispute was not found in Supabase.');
+              var storedDispute = parseJsonValue(rows[0].data, {});
+              if(storedDispute.status !== 'resolved' || storedDispute.resolution !== resolution){
+                throw new Error('Dispute resolution was not persisted for '+(affectedDisputes[idx].id || affectedDisputes[idx].dbRowId)+'.');
+              }
+            });
+
+            // Save the Question Bank decision.
+            if(q){
+              await supaRequest(supaUrl('question_bank')+'?id=eq.'+encodeURIComponent(q.dbRowId || q.id), {
+                method:'PATCH', headers:{'Prefer':'return=representation'},
+                body:JSON.stringify({data:JSON.stringify(q),updated_at:new Date().toISOString()})
+              });
+              var qVerify = await supaRequest(supaUrl('question_bank')+'?select=id,data&id=eq.'+encodeURIComponent(q.dbRowId || q.id));
+              if(!qVerify || !qVerify.length) throw new Error('Updated question was not found in Supabase.');
+              var storedQuestion = parseJsonValue(qVerify[0].data, {});
+              var storedAccepted = Array.isArray(storedQuestion.acceptedIndexes) ? storedQuestion.acceptedIndexes.map(Number).sort(function(a,b){return a-b;}) : [];
+              var expectedAccepted = finalAcceptedIndexes.slice().map(Number).sort(function(a,b){return a-b;});
+              if(JSON.stringify(storedAccepted)!==JSON.stringify(expectedAccepted)) throw new Error('Accepted answer state was not persisted correctly.');
+            }
+
+            // IMPORTANT: fetch ALL attempts directly from Supabase and recalculate
+            // every affected user from the authoritative database state.
+            var remarkText = resolution === 'both_correct'
+              ? 'Both answers are accepted as correct for this question.'
+              : resolution === 'disputed_correct'
+                ? 'Your answer was accepted as correct after a dispute review.'
+                : 'Original answer confirmed correct.';
+            changedAttempts = await recalculateAndPersistAllAffectedAttempts(d.questionId, finalAcceptedIndexes, remarkText);
+
+            // Re-read authoritative Supabase state before showing success.
+            var freshAfterResolve = await gsGetAllData();
+            state.data = normalizeData(freshAfterResolve);
+            if(!state.lastSyncedData) state.lastSyncedData={};
+            state.lastSyncedData.disputes=JSON.parse(JSON.stringify(state.data.disputes));
+            state.lastSyncedData.questionBank=JSON.parse(JSON.stringify(state.data.questionBank));
+            state.lastSyncedData.quizAttempts=JSON.parse(JSON.stringify(state.data.quizAttempts));
+            render();
+            notify('Dispute resolved. Final accepted answer and all affected user marks have been saved and verified.','success');
+          }catch(e){
+            // Roll back all locally changed dispute states if any database write fails.
+            oldStatuses.forEach(function(old){
+              var item=state.data.disputes.find(function(x){return x.id===old.id;});
+              if(item){item.status=old.status;item.resolution=old.resolution;item.resolvedAt=old.resolvedAt;}
+            });
+            console.error('Dispute resolution save error:',e);
+            notify('Dispute approval could not be saved. '+e.message,'error');
+          }
         }
         var btnDisputed = document.createElement('button');
+        btnDisputed.type = 'button';
         btnDisputed.className = 'btn primary small'; btnDisputed.textContent = 'Disputed answer is correct';
-        btnDisputed.onclick = function(){ resolveDispute('disputed_correct'); };
+        btnDisputed.onclick = async function(){ if(btnDisputed.disabled) return; btnDisputed.disabled=true; btnOriginal.disabled=true; btnBoth.disabled=true; try{ await resolveDispute('disputed_correct'); } catch(e){ btnDisputed.disabled=false; btnOriginal.disabled=false; btnBoth.disabled=false; } };
         var btnOriginal = document.createElement('button');
+        btnOriginal.type = 'button';
         btnOriginal.className = 'btn secondary small'; btnOriginal.textContent = 'Original answer confirmed correct';
-        btnOriginal.onclick = function(){ resolveDispute('original_correct'); };
+        btnOriginal.onclick = async function(){ if(btnOriginal.disabled) return; btnDisputed.disabled=true; btnOriginal.disabled=true; btnBoth.disabled=true; try{ await resolveDispute('original_correct'); } catch(e){ btnDisputed.disabled=false; btnOriginal.disabled=false; btnBoth.disabled=false; } };
         var btnBoth = document.createElement('button');
+        btnBoth.type = 'button';
         btnBoth.className = 'btn secondary small'; btnBoth.textContent = 'Both answers accepted';
-        btnBoth.onclick = function(){ resolveDispute('both_correct'); };
+        btnBoth.onclick = async function(){ if(btnBoth.disabled) return; btnDisputed.disabled=true; btnOriginal.disabled=true; btnBoth.disabled=true; try{ await resolveDispute('both_correct'); } catch(e){ btnDisputed.disabled=false; btnOriginal.disabled=false; btnBoth.disabled=false; } };
         btnRow.appendChild(btnDisputed); btnRow.appendChild(btnOriginal); btnRow.appendChild(btnBoth);
         block.appendChild(btnRow);
         pendingCard.appendChild(block);
@@ -2525,6 +2862,7 @@ table.data-table tr:last-child td{border-bottom:none;}
     titleCard.innerHTML = '<h2 style="font-size:16px;margin:0 0 14px;">'+(isScopedToTeam ? escapeHtml(teamFilter)+' \u2014 Team Dashboard' : 'Reports & Results Monitoring')+'</h2>';
     wrap.appendChild(titleCard);
     wrap.appendChild(renderKnowledgeUpdatesCard());
+    if(!isScopedToTeam) wrap.appendChild(renderAllTeamsTopPerformersCard());
 
     var effectiveTeam = isScopedToTeam ? teamFilter : state.reportsTeamFilter;
 
@@ -2685,7 +3023,8 @@ table.data-table tr:last-child td{border-bottom:none;}
       table.innerHTML = '<tr><th>User</th><th>Team</th><th>Quiz</th><th>Score</th><th>Date</th><th></th></tr>';
       attempts.slice().sort(function(a,b){return b.finishedAt-a.finishedAt;}).forEach(function(a){
         var tr = document.createElement('tr');
-        tr.innerHTML = '<td>'+escapeHtml(a.userName)+'</td><td>'+escapeHtml(a.team||'\u2014')+'</td><td>'+escapeHtml(a.quizTitle)+'</td><td>'+a.score+' / '+a.total+'</td><td>'+fmtDate(a.quizDate)+'</td>';
+        var effectiveRowScore = effectiveAttemptScore(a);
+        tr.innerHTML = '<td>'+escapeHtml(a.userName)+'</td><td>'+escapeHtml(a.team||'\u2014')+'</td><td>'+escapeHtml(a.quizTitle)+'</td><td>'+effectiveRowScore.score+' / '+effectiveRowScore.total+'</td><td>'+fmtDate(a.quizDate)+'</td>';
         var tdA = document.createElement('td');
         tdA.style.cssText = 'display:flex;gap:6px;';
         var viewBtn = document.createElement('button');
@@ -2723,11 +3062,17 @@ table.data-table tr:last-child td{border-bottom:none;}
     head.innerHTML = '<div><div class="modal-title">'+escapeHtml(a.quizTitle)+'</div><div style="font-size:12px;color:var(--text-dim);margin-top:4px;">'+escapeHtml(a.userName)+' &middot; '+escapeHtml(a.team||'\u2014')+' &middot; '+fmtDateTime(a.finishedAt)+' &middot; Score: '+a.score+' / '+a.total+'</div></div>';
     var closeBtn = document.createElement('button');
     closeBtn.className = 'modal-close'; closeBtn.textContent = '\u2715';
-    closeBtn.onclick = function(){ state.viewingAttemptId = null; render(); };
+    closeBtn.onclick = function(){ state.viewingAttemptId = null; state.disputingAnswerIndex = null; state.historyOpenAttemptId = null; render(); };
     head.appendChild(closeBtn);
     box.appendChild(head);
 
     (a.answers||[]).forEach(function(ans){
+      var currentQ = state.data.questionBank.find(function(q){return q.id===ans.questionId;});
+      var resolvedDispute = state.data.disputes.find(function(d){return d.attemptId===a.id && d.questionId===ans.questionId && d.status==='resolved';});
+      if(currentQ && resolvedDispute){
+        ans.isCorrect = isAnswerAccepted(currentQ, ans.selectedIndex);
+        ans.correctOption = (currentQ.options && currentQ.options[currentQ.correctIndex]) || ans.correctOption;
+      }
       var block = document.createElement('div');
       block.className = 'review-block';
       block.innerHTML = '<div class="review-q">'+escapeHtml(ans.questionText)+'</div>'+
@@ -2800,7 +3145,8 @@ table.data-table tr:last-child td{border-bottom:none;}
       wrap.appendChild(noTeamCard);
       return wrap;
     }
-    wrap.appendChild(renderLeaderboardCard(5, user.team));
+    // Every user can see the global top 3 across all teams.
+    wrap.appendChild(renderLeaderboardCard(3, null));
 
     var card = document.createElement('div');
     card.className = 'card';
@@ -2815,7 +3161,7 @@ table.data-table tr:last-child td{border-bottom:none;}
     }).map(function(a){ return a.quizId; });
     var available = state.data.quizzes.filter(function(q){
       return q.team === user.team &&
-             quizStatus(q) !== 'off' &&
+             quizStatus(q) !== 'off' && quizStatus(q) !== 'ended' &&
              completed.indexOf(q.id) === -1;
     });
     if(available.length === 0){
@@ -2828,7 +3174,7 @@ table.data-table tr:last-child td{border-bottom:none;}
         var alreadyDone = completed.indexOf(quiz.id) !== -1;
         var info = document.createElement('div');
         info.innerHTML = '<div class="quiz-list-title">'+escapeHtml(quiz.title)+'</div>'+
-          '<div class="quiz-list-meta">'+quiz.questionIds.length+' question(s) &middot; '+quiz.durationMinutes+' min &middot; '+fmtDate(quiz.scheduledDate)+' at '+quiz.scheduledTime+'</div>';
+          '<div class="quiz-list-meta">'+quiz.questionIds.length+' question(s) &middot; '+quiz.durationMinutes+' min &middot; '+fmtDate(quiz.startDate||quiz.scheduledDate)+' '+(quiz.startTime||quiz.scheduledTime)+' → '+fmtDate(quiz.endDate||quiz.scheduledDate)+' '+(quiz.endTime||'')+'</div>';
         row.appendChild(info);
         var actionBtn = document.createElement('button');
         if(alreadyDone){
@@ -2851,30 +3197,88 @@ table.data-table tr:last-child td{border-bottom:none;}
   function renderAnswerReviewBlock(attempt, ans, idx, keyPrefix){
     var block = document.createElement('div');
     block.className = 'review-block';
+    var quizForAttempt = state.data.quizzes.find(function(q){return q.id===attempt.quizId;});
+    var published = !quizForAttempt || quizResultsPublished(quizForAttempt);
+    var currentQ = state.data.questionBank.find(function(q){return q.id===ans.questionId;});
+    var resolvedDispute = state.data.disputes.find(function(d){return d.attemptId===attempt.id && d.questionId===ans.questionId && d.status==='resolved';});
+    if(currentQ && resolvedDispute){
+      ans.isCorrect = isAnswerAccepted(currentQ, ans.selectedIndex);
+      ans.correctOption = (currentQ.options && currentQ.options[currentQ.correctIndex]) || ans.correctOption;
+    }
     block.innerHTML = '<div class="review-q">'+escapeHtml(ans.questionText)+'</div>'+
-      '<div class="review-a">Your answer: <b style="color:'+(ans.isCorrect?'var(--green)':'var(--red)')+';">'+escapeHtml(ans.selectedOption)+'</b>'+(ans.isCorrect?'':' &middot; Correct: '+escapeHtml(ans.correctOption))+'</div>'+
+      '<div class="review-a">Your answer: <b style="color:'+(ans.isCorrect?'var(--green)':'var(--red)')+';">'+escapeHtml(ans.selectedOption)+'</b>'+(published && !ans.isCorrect?' &middot; Correct: '+escapeHtml(ans.correctOption):'')+'</div>'+
       (ans.remark ? '<div class="review-remark">\u2713 '+escapeHtml(ans.remark)+'</div>' : '');
 
+    if(!published){ return block; }
     if(!ans.isCorrect){
+      if(resolvedDispute){
+        var resolvedLabel = document.createElement('div');
+        resolvedLabel.className='review-remark';
+        resolvedLabel.textContent='Dispute resolved — no further dispute can be raised for this answer.';
+        block.appendChild(resolvedLabel);
+        return block;
+      }
       var disputeKey = keyPrefix + '-' + idx;
       if(state.disputingAnswerIndex === disputeKey){
         var noteInput = document.createElement('textarea');
         noteInput.placeholder = 'Why do you think your answer should be correct? (optional)';
         noteInput.style.cssText = 'width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;margin-top:8px;min-height:60px;';
-        block.appendChild(noteInput);
+        var optionsBox=document.createElement('div'); optionsBox.style.cssText='margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);font-size:12px;';
+        optionsBox.innerHTML='<b>Question & Answer</b><div style="margin-top:6px;">'+(ans.options||[]).map(function(op,i){return '<div style="padding:3px 0;">'+String.fromCharCode(65+i)+'. '+escapeHtml(op)+(i===ans.selectedIndex?' <b>(Your answer)</b>':'')+(i===ans.correctIndex?' <b>(Marked correct)</b>':'')+'</div>';}).join('')+'</div>';
+        block.appendChild(optionsBox); block.appendChild(noteInput);
         var submitBtn = document.createElement('button');
         submitBtn.className = 'btn primary small'; submitBtn.style.marginTop = '8px'; submitBtn.textContent = 'Submit dispute';
-        submitBtn.onclick = function(){
+        submitBtn.onclick = async function(){
           var user = currentUser();
-          state.data.disputes.push({
-            id: uid(), attemptId: attempt.id, userId: state.currentUserId, userName: user.name, team: user.team,
+          var dispute = {
+            id: uid(), attemptId: attempt.id, userId: state.currentUserId, userName: user.name, userEmail: user.email || '', team: user.team,
             questionId: ans.questionId, questionText: ans.questionText,
             selectedIndex: ans.selectedIndex, selectedOption: ans.selectedOption,
             originalCorrectIndex: ans.correctIndex, originalCorrectOption: ans.correctOption,
-            options: ans.options, note: noteInput.value.trim(),
+            options: ans.options || [], note: noteInput.value.trim(),
             status: 'pending', resolution: null, adminNote: '', createdAt: Date.now(), resolvedAt: null
-          });
-          saveData(); state.disputingAnswerIndex = null; render();
+          };
+          submitBtn.disabled=true; submitBtn.textContent='Submitting...';
+          try{
+            // Never create a second pending dispute for the same attempt/question.
+            // This also protects against double-clicks and stale browser state.
+            var localPending = state.data.disputes.find(function(x){
+              return x.status==='pending' && x.attemptId===dispute.attemptId && x.questionId===dispute.questionId;
+            });
+            if(localPending){
+              state.disputingAnswerIndex=null; state.historyOpenAttemptId=attempt.id; render();
+              notify('A dispute for this question is already pending.','info');
+              return;
+            }
+            var remote = await supaRequest(supaUrl('disputes')+'?select=id,data');
+            var remoteRows = Array.isArray(remote) ? remote : [];
+            var remotePending = remoteRows.some(function(row){
+              try{ var x=typeof row.data==='string'?JSON.parse(row.data):row.data; return x && x.status==='pending' && x.attemptId===dispute.attemptId && x.questionId===dispute.questionId; }catch(_){ return false; }
+            });
+            if(remotePending){
+              state.data.disputes = await supabaseGetCollection('disputes');
+              state.disputingAnswerIndex=null; state.historyOpenAttemptId=attempt.id; render();
+              notify('A dispute for this question is already pending.','info');
+              return;
+            }
+            // Save the dispute directly to public.disputes.
+            await supaRequest(supaUrl('disputes'), {
+              method:'POST',
+              headers:{'Prefer':'return=representation'},
+              body:JSON.stringify({id:dispute.id, data:JSON.stringify(dispute), created_at:new Date(dispute.createdAt).toISOString(), updated_at:new Date().toISOString()})
+            });
+            state.data.disputes.push(dispute);
+            if(!state.lastSyncedData) state.lastSyncedData={};
+            state.lastSyncedData.disputes=JSON.parse(JSON.stringify(state.data.disputes));
+            state.disputingAnswerIndex = null;
+            state.historyOpenAttemptId = attempt.id;
+            render();
+            notify('Dispute submitted successfully and saved to database.','success');
+          }catch(e){
+            console.error('Dispute save error:',e);
+            submitBtn.disabled=false; submitBtn.textContent='Submit dispute';
+            notify('Dispute could not be saved. '+e.message,'error');
+          }
         };
         block.appendChild(submitBtn);
         var cancelDBtn = document.createElement('button');
@@ -2885,12 +3289,16 @@ table.data-table tr:last-child td{border-bottom:none;}
         var existingDispute = state.data.disputes.find(function(d){ return d.attemptId === attempt.id && d.questionId === ans.questionId; });
         var disputeBtn = document.createElement('button');
         disputeBtn.className = 'btn secondary small'; disputeBtn.style.marginTop = '8px';
-        if(existingDispute){
-          disputeBtn.textContent = existingDispute.status === 'pending' ? 'Dispute submitted \u2014 pending review' : 'Dispute reviewed';
+        if(existingDispute && existingDispute.status === 'pending'){
+          disputeBtn.textContent = 'Dispute submitted \u2014 pending review';
           disputeBtn.disabled = true;
+        }else if(existingDispute && existingDispute.status === 'resolved'){
+          disputeBtn.textContent = 'Dispute resolved';
+          disputeBtn.disabled = true;
+          disputeBtn.title = 'This question has already been reviewed and resolved. A second dispute cannot be raised.';
         }else{
           disputeBtn.textContent = 'Raise a dispute';
-          disputeBtn.onclick = function(){ state.disputingAnswerIndex = disputeKey; render(); };
+          disputeBtn.disabled = true; disputeBtn.onclick = null;
         }
         block.appendChild(disputeBtn);
       }
@@ -2902,7 +3310,14 @@ table.data-table tr:last-child td{border-bottom:none;}
     var wrap = document.createElement('div');
     var card = document.createElement('div');
     card.className = 'card';
-    card.innerHTML = '<div class="section-title">My quiz history</div>';
+    card.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;"><div class="section-title" style="margin:0;">My quiz history</div><button id="refreshHistoryBtn" class="btn secondary small">↻ Refresh marks</button></div>';
+    card.querySelector('#refreshHistoryBtn').onclick = async function(){
+      var btn=this; btn.disabled=true; btn.textContent='Refreshing...';
+      try{
+        var fresh=await gsGetAllData();
+        state.data=normalizeData(fresh); render(); notify('Latest marks loaded from database.','success');
+      }catch(e){ notify('Could not refresh marks: '+e.message,'error'); btn.disabled=false; btn.textContent='↻ Refresh marks'; }
+    };
 
     var filterRow = document.createElement('div');
     filterRow.className = 'filter-row';
@@ -2944,6 +3359,15 @@ table.data-table tr:last-child td{border-bottom:none;}
     var listHolder = document.createElement('div');
     card.appendChild(listHolder);
 
+    async function refreshMyAttemptsFromServer(){
+      try{
+        var rows = await supaRequest(supaUrl('quiz_attempts','?select=id,data,created_at,updated_at'));
+        var mine = (rows||[]).map(function(row){ var a=parseJsonValue(row.data,{}); a.dbRowId=row.id; return a; }).filter(function(a){return a.userId===state.currentUserId;});
+        var others = (state.data.quizAttempts||[]).filter(function(a){return a.userId!==state.currentUserId;});
+        state.data.quizAttempts = others.concat(mine);
+      }catch(e){ console.warn('Could not refresh user attempts:',e); }
+    }
+
     function renderHistoryList(){
       listHolder.innerHTML = '';
       var myAttempts = state.data.quizAttempts.filter(function(a){return a.userId===state.currentUserId;});
@@ -2960,13 +3384,16 @@ table.data-table tr:last-child td{border-bottom:none;}
         return;
       }
       myAttempts.forEach(function(a){
-        var pct = Math.round(a.score/a.total*100);
+        var quiz = state.data.quizzes.find(function(q){return q.id===a.quizId;});
+        var published = !quiz || quizResultsPublished(quiz);
+        var pct = published ? Math.round(a.score/a.total*100) : null;
         var block = document.createElement('div');
         block.style.cssText = 'border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;';
+        if(!published){ var pq=quiz||{}; block.innerHTML='<div style="font-weight:600;">'+escapeHtml(a.quizTitle)+'</div><div style="font-size:12px;color:var(--text-mute);margin-top:6px;">Submitted successfully. Your marks and answers will be published automatically after '+escapeHtml(fmtDateTime(quizEndMs(pq)))+'.</div>'; }
         var head = document.createElement('div');
         head.style.cssText = 'display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;';
         head.innerHTML = '<div><div style="font-weight:700;font-size:14px;">'+escapeHtml(a.quizTitle)+'</div><div style="font-size:11px;color:var(--text-dim);">'+fmtDate(a.quizDate)+' &middot; completed '+fmtDateTime(a.finishedAt)+'</div></div>'+
-          '<div style="font-weight:700;font-size:15px;">'+a.score+' / '+a.total+' ('+pct+'%)</div>';
+          '<div style="font-weight:700;font-size:15px;">'+(published ? a.score+' / '+a.total+' ('+pct+'%)' : 'Result pending')+'</div>';
         block.appendChild(head);
 
         var toggleBtn = document.createElement('button');
@@ -2975,21 +3402,73 @@ table.data-table tr:last-child td{border-bottom:none;}
         var reviewHolder = document.createElement('div');
         reviewHolder.style.display = 'none';
         reviewHolder.style.marginTop = '10px';
+        var keepOpen = state.historyOpenAttemptId === a.id || state.disputingAnswerIndex === ('hist-'+a.id+'-'+0);
         toggleBtn.onclick = function(){
           var showing = reviewHolder.style.display !== 'none';
           reviewHolder.style.display = showing ? 'none' : 'block';
+          state.historyOpenAttemptId = showing ? null : a.id;
           toggleBtn.textContent = showing ? 'View questions & answers' : 'Hide questions & answers';
         };
-        (a.answers||[]).forEach(function(ans, idx){
-          reviewHolder.appendChild(renderAnswerReviewBlock(a, ans, idx, 'hist-'+a.id));
-        });
-        block.appendChild(toggleBtn);
-        block.appendChild(reviewHolder);
+        if(published){
+          (a.answers||[]).forEach(function(ans, idx){
+            reviewHolder.appendChild(renderAnswerReviewBlock(a, ans, idx, 'hist-'+a.id));
+          });
+          if(state.disputingAnswerIndex && state.disputingAnswerIndex.indexOf('hist-'+a.id+'-')===0){ state.historyOpenAttemptId=a.id; }
+          if(state.historyOpenAttemptId === a.id){
+            reviewHolder.style.display='block';
+            toggleBtn.textContent='Hide questions & answers';
+          }
+          block.appendChild(toggleBtn);
+          block.appendChild(reviewHolder);
+        }
         listHolder.appendChild(block);
       });
     }
     renderHistoryList();
     wrap.appendChild(card);
+    return wrap;
+  }
+
+  /* ================= USER: MY PROFILE ================= */
+  function renderUserProfile(){
+    var wrap=document.createElement('div');
+    var card=document.createElement('div'); card.className='card profile-cover-card';
+    var user=currentUser(); if(!user) return wrap;
+    var cover=document.createElement('div'); cover.className='profile-cover';
+    var coverImg=document.createElement('img'); coverImg.alt='Guardian Cover Photo';
+    coverImg.src=user.photoCover || 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABLEAAAJ1CAIAAACpdPWbAAAAAXNSR0IB2cksfwAAIABJREFUeJzs3W9sG2li53mKFClSJVNtp7uZpJvIgLuY6V5Z3txNZtrkmyRoDiBnD5DXi4yC1mFjHyDhXnTH8Jxwa1xW6l3rAjgLpX3OzGEB6YV9O6s5qIM41mWzFm64SL+i3DOYS2CZ6evBhTcLdd+O7G7bokVRIkX6XjyeajZZVawqVpFFPt8PBgO3/pTqH6ue3/N34NG7/60PAAAAACCfY+f/p8Hy3/2o27sBAAAAAOiCWvGpv9v7AAAAAADoGjIhAAAAAMiLTAgAAAAA8iITAgAAAIC8yIQAAAAAIC8yIQAAAADIi0wIAAAAAPIiEwIAAACAvMiEAAAAACAvMiEAAAAAyItMCAAAAADyIhMCAAAAgLzIhAAAAAAgLzIhAAAAAMiLTAgAAAAA8iITAgAAAIC8yIQAAAAAIC8yIQAAAADIi0wIAAAAAPIiEwIAAACAvMiEAAAAACAvMiEAAAAAyItMCAAAAADyIhMCAAAAgLzIhAAAAAAgLzIhAAAAAMiLTAgAAAAA8iITAgAAAIC8yIQAAAAAIC8yIQAAAADIi0wIAAAAAPIiEwIAAACAvMiEAAAAACAvMiEAAAAAyItMCAAAAADyIhMCAAAAgLzIhAAAAAAgLzIhAAAAAMiLTAgAAAAA8iITAgAAAIC8yIQAAAAAIC8yIQAAAADIi0wIAAAAAPIiEwIAAACAvMiEAAAAACAvMiEAAAAAyItMCAAAAADyIhMCAAAAgLzIhAAAAAAgLzIhAAAAAMiLTAgAAAAA8iITAgAAAIC8yIQAAAAAIC8yIQAAAADIi0wIAAAAAPIiEwIAAACAvMiEAAAAACAvMiEAAAAAyItMCAAAAADyIhMCAAAAgLzIhAAAAAAgLzIhAAAAAMiLTAgAAAAA8iITAgAAAIC8yIQAAAAAIC8yIQAAAADIi0wIAAAAAPIiEwIAAACAvMiEAAAAACAvMiEAAAAAyItMCAAAAADyIhMCAAAAgLzIhAAAAAAgLzIhAAAAAMiLTAgAAAAA8iITAgAAAIC8yIQAAAAAIC8yIQAAAADIi0wIAAAAAPIiEwIAAACAvMiEAAAAACAvMiEAAAAAyItMCAAAAADyIhMCAAAAgLzIhAAAAAAgLzIhAAAAAMiLTAgAAAAA8iITAgAAAIC8yIQAAAAAIC8yIQAAAADIi0wIAAAAAPIiEwIAAACAvMiEAAAAACAvMiEAAAAAyItMCAAAAADyIhMCAAAAgLzIhAAAAAAgLzIhAAAAAMiLTAgAAAAA8iITAgAAAIC8yIQAAAAAIC8yIQAAAADIi0wIAAAAAPIiEwIAAACAvMiEAAAAACAvMiEAAAAAyItMCAAAAADyIhMCAAAAgLzIhAAAAAAgLzIhAAAAAMiLTAgAAAAA8iITAgAAAIC8yIQAAAAAIC8yIQAAAADIi0wIAAAAAPIiEwIAAACAvMiEAAAAACAvMiEAAAAAyItMCAAAAADyIhMCAAAAgLzIhAAAAAAgLzIhAAAAAMiLTAgAAAAA8iITAgAAAIC8yIQAAAAAIC8yIQAAAADIi0wIAAAAAPIiEwIAAACAvMiEAAAAACAvMiEAAAAAyItMCAAAAADyIhMCAAAAgLzIhAAAAAAgLzIhAAAAAMiLTAgAAAAA8iITAgAAAIC8yIQAAAAAIC8yIQAAAADIi0wIAAAAAPIiEwIAAACAvMiEAAAAACAvMiEAAAAAyItMCAAAAADyIhMCAAAAgLzIhAAAAAAgLzIhAAAAAMiLTAgAAAAA8iITAgAAAIC8yIQAAAAAIC8yIQAAAADIi0wIAAAAAPIiEwIAAACAvMiEAAAAACAvMiEAAAAAyItMCAAAAADyIhMCAAAAgLzIhAAAAAAgLzIhAAAAAMiLTAgAAAAA8iITAgAAAIC8yIQAAAAAIC8yIQAAAADIi0wIAAAAAPIiEwIAAACAvMiEAAAAACAvMiEAAAAAyItMCAAAAADyIhMCAAAAgLzIhAAAAAAgLzIhAAAAAMiLTAgAAAAA8iITAgAAAIC8yIQAAAAAIC8yIQAAAADIi0wIAAAAAPIiEwIAAACAvMiEAAAAACAvMiEAAAAAyItMCAAAAADyIhMCAAAAgLzIhAAAAAAgLzIhAAAAAMiLTAgAAAAA8iITAgAAAIC8yIQAAAAAIC8yIQAAAADIi0wIAAAAAPIiEwIAAACAvMiEAAAAACAvMiEAAAAAyItMCAAAAADyIhMCAAAAgLzIhAAAAAAgLzIhAAAAAMiLTAgAAAAA8iITAgAAAIC8yIQAAAAAIC8yIQAAAADIi0wIAAAAAPIiEwIAAACAvMiEAAAAACAvMiEAAAAAyItM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';
+    cover.appendChild(coverImg);
+    card.appendChild(cover);
+
+    var info=document.createElement('div'); info.className='profile-info-section';
+    var aw=document.createElement('div'); aw.className='profile-avatar-wrap';
+    var initials=user.name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+    if(user.photo){var ai=document.createElement('img');ai.src=user.photo;ai.alt='Profile Picture';aw.appendChild(ai);}else{var af=document.createElement('div');af.className='profile-avatar-fallback';af.textContent=initials;aw.appendChild(af);}
+    var al=document.createElement('label');al.className='edit-avatar-btn';al.innerHTML='📷';al.title='Change profile photo';al.htmlFor='profileAvatarUpload';
+    var avatarInput=document.createElement('input');avatarInput.type='file';avatarInput.accept='image/png,image/jpeg,image/webp';avatarInput.style.display='none';avatarInput.id='profileAvatarUpload';
+    aw.appendChild(al); aw.appendChild(avatarInput); info.appendChild(aw);
+    var name=document.createElement('h2');name.className='profile-name';name.textContent=user.name;info.appendChild(name);
+    var meta=document.createElement('p');meta.className='profile-meta';meta.textContent=(user.role||'User')+(user.team?' · '+user.team:'');info.appendChild(meta);
+    var details=document.createElement('div');details.className='profile-details';
+    [['Email',user.email],['Role',user.role||'User'],['Team',user.team||'No team'],['Status',user.status||'Active']].forEach(function(pair){var d=document.createElement('div');d.className='profile-detail';d.innerHTML='<div class="profile-detail-label">'+escapeHtml(pair[0])+'</div><div class="profile-detail-value">'+escapeHtml(pair[1]||'—')+'</div>';details.appendChild(d);});
+    info.appendChild(details); card.appendChild(info); wrap.appendChild(card);
+
+    // My Quiz History is part of My Profile, directly below Email/Role/Team/Status.
+    var historySection = renderUserHistory();
+    historySection.style.marginTop = '16px';
+    wrap.appendChild(historySection);
+
+    function processImage(file,isCover){
+      if(!file)return; if(file.size>8*1024*1024){notify('Please choose an image smaller than 8 MB.','error');return;}
+      var reader=new FileReader(); reader.onload=function(ev){var img=new Image(); img.onload=function(){
+        var max=isCover?1400:480, scale=Math.min(1,max/Math.max(img.width,img.height));
+        var c=document.createElement('canvas'); c.width=Math.max(1,Math.round(img.width*scale)); c.height=Math.max(1,Math.round(img.height*scale));
+        var ctx=c.getContext('2d'); ctx.drawImage(img,0,0,c.width,c.height);
+        if(isCover) user.photoCover=c.toDataURL('image/jpeg',.80); else user.photo=c.toDataURL('image/jpeg',.82);
+        setTimeout(saveData,0); render(); notify(isCover?'Cover photo updated.':'Profile photo updated.','success');
+      }; img.src=ev.target.result;}; reader.readAsDataURL(file);
+    }
+    avatarInput.onchange=function(e){processImage(e.target.files&&e.target.files[0],false);avatarInput.value='';};
     return wrap;
   }
 
@@ -3043,6 +3522,7 @@ table.data-table tr:last-child td{border-bottom:none;}
 
   /* ================= QUIZ TAKING ================= */
   async function openQuiz(quiz){
+    if(quizStatus(quiz)!=='running'){ notify(quizStatus(quiz)==='scheduled'?'This quiz has not started yet.':'This quiz has ended.','error'); return; }
     var userId = state.currentUserId;
     // Supabase quiz_attempts is authoritative. If the DB row was deleted,
     // the quiz must be allowed again even if an old local/meta completion flag exists.
@@ -3056,7 +3536,7 @@ table.data-table tr:last-child td{border-bottom:none;}
       quiz: quiz,
       questions: quiz.questionIds.map(function(id){ return state.data.questionBank.find(function(q){return q.id===id;}); }).filter(Boolean),
       index: 0, selections: {}, done: false,
-      startedAt: Date.now(), deadline: Date.now() + quiz.durationMinutes*60000,
+      startedAt: Date.now(), deadline: Math.min(Date.now() + quiz.durationMinutes*60000, quizEndMs(quiz)),
       attemptId: null
     };
     state.quizSession = qs;
@@ -3099,14 +3579,26 @@ table.data-table tr:last-child td{border-bottom:none;}
       box.appendChild(head);
       startQuizModalTimer();
 
+      var optionButtons = [];
+      var dotButtons = [];
+      var refreshQuizQuestionInPlace = function(){
+        var currentQ=qs.questions[qs.index];
+        progress.textContent = 'Question ' + (qs.index+1) + ' of ' + qs.questions.length;
+        qEl.textContent=currentQ.question;
+        optionButtons.forEach(function(btn,i){ btn.textContent=currentQ.options[i]||''; btn.classList.toggle('selected',qs.selections[qs.index]===i); });
+        dotButtons.forEach(function(dot,i){ dot.classList.toggle('current',i===qs.index); dot.classList.toggle('answered',qs.selections[i]!==undefined); });
+        prevBtn.disabled=qs.index===0;
+        var last=qs.index===qs.questions.length-1; nextBtn.textContent=last?'Submit quiz':'Next →';
+      };
+
       var dots = document.createElement('div');
       dots.className = 'quiz-dots';
       qs.questions.forEach(function(q, i){
         var dot = document.createElement('div');
         dot.className = 'quiz-dot' + (i===qs.index?' current':'') + (qs.selections[i]!==undefined?' answered':'');
         dot.textContent = i+1;
-        dot.onclick = function(){ qs.index = i; render(); };
-        dots.appendChild(dot);
+        dot.onclick = function(){ qs.index = i; refreshQuizQuestionInPlace(); };
+        dotButtons.push(dot); dots.appendChild(dot);
       });
       box.appendChild(dots);
 
@@ -3125,6 +3617,7 @@ table.data-table tr:last-child td{border-bottom:none;}
         var b = document.createElement('button');
         b.className = 'quiz-option' + (qs.selections[qs.index]===i ? ' selected' : '');
         b.textContent = opt;
+        optionButtons.push(b);
         b.onclick = function(){
           qs.selections[qs.index] = i;
           var opts = box.querySelectorAll('.quiz-option');
@@ -3141,7 +3634,7 @@ table.data-table tr:last-child td{border-bottom:none;}
       var prevBtn = document.createElement('button');
       prevBtn.className = 'btn secondary'; prevBtn.textContent = '\u2190 Previous';
       prevBtn.disabled = qs.index === 0;
-      prevBtn.onclick = function(){ qs.index -= 1; render(); };
+      prevBtn.onclick = function(){ if(qs.index>0){ qs.index -= 1; refreshQuizQuestionInPlace(); } };
       navRow.appendChild(prevBtn);
 
       var isLast = qs.index === qs.questions.length - 1;
@@ -3149,7 +3642,8 @@ table.data-table tr:last-child td{border-bottom:none;}
       nextBtn.className = 'btn primary';
       nextBtn.textContent = isLast ? 'Submit quiz' : 'Next \u2192';
       nextBtn.onclick = function(){
-        if(isLast){
+        var lastNow = qs.index === qs.questions.length - 1;
+        if(lastNow){
           var unanswered = qs.questions.length - Object.keys(qs.selections).length;
           if(unanswered > 0){
             if(!confirm(unanswered + ' question(s) are still unanswered. Submit anyway?')) return;
@@ -3158,7 +3652,7 @@ table.data-table tr:last-child td{border-bottom:none;}
           nextBtn.textContent = 'Submitting...';
           finishQuiz().finally(function(){ if(state.quizSession && !state.quizSession.done) { nextBtn.disabled=false; nextBtn.textContent='Submit quiz'; } });
         }else{
-          qs.index += 1; render();
+          qs.index += 1; refreshQuizQuestionInPlace();
         }
       };
       navRow.appendChild(nextBtn);
