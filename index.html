@@ -717,6 +717,24 @@ table.data-table tr:last-child td{border-bottom:none;}
     try{ localStorage.setItem(completionStorageKey(userId, quizId), '1'); }catch(e){}
   }
 
+  async function upsertDisputes(items){
+    items = items || [];
+    if(!items.length) return;
+    var rows = items.map(function(item){
+      return {id: item.id || uid(), data: JSON.stringify(item), updated_at: new Date().toISOString()};
+    });
+    // Disputes are only ever added or have their status updated — never
+    // deleted from the local array. A delete-then-insert replace here would
+    // risk wiping the whole table if the DELETE succeeds but the following
+    // POST fails (RLS denial, network blip, etc.). Merge-upsert by id is
+    // atomic per row and safe for concurrent admins/users.
+    await supaRequest(supaUrl('disputes') + '?on_conflict=id', {
+      method:'POST',
+      headers:{'Prefer':'resolution=merge-duplicates,return=representation'},
+      body:JSON.stringify(rows)
+    });
+  }
+
   async function saveTeams(items){
     // Current Supabase schema: public.teams(id uuid, name text, created_at timestamptz)
     var current = await supaRequest(supaUrl('teams', '?select=id'));
@@ -730,11 +748,16 @@ table.data-table tr:last-child td{border-bottom:none;}
   }
 
   async function saveMetaKey(key, value){
-    await supaRequest(supaUrl('meta', '?key=eq.' + encodeURIComponent(key)), {
-      method:'DELETE'
-    });
-    await supaRequest(supaUrl('meta'), {
+    // Was: DELETE then POST. If two saves for the same key land close
+    // together (e.g. a dispute resolve triggers a score recompute that
+    // also touches meta), the first save's DELETE+POST can complete
+    // in between the second save's DELETE and POST, so the second POST
+    // hits a row that already exists again -> "duplicate key value
+    // violates unique constraint meta_pkey" (409). Upsert by key is
+    // atomic and avoids this race entirely.
+    await supaRequest(supaUrl('meta') + '?on_conflict=key', {
       method:'POST',
+      headers:{'Prefer':'resolution=merge-duplicates,return=representation'},
       body:JSON.stringify({key:key, value:JSON.stringify(value), updated_at:new Date().toISOString()})
     });
   }
@@ -767,7 +790,7 @@ table.data-table tr:last-child td{border-bottom:none;}
       else if(key === 'questionBank') await upsertJsonCollection('question_bank', payloadObj[key]);
       else if(key === 'quizzes') await upsertJsonCollection('quizzes', payloadObj[key]);
       else if(key === 'quizAttempts') await upsertQuizAttempts(payloadObj[key]);
-      else if(key === 'disputes') await upsertJsonCollection('disputes', payloadObj[key]);
+      else if(key === 'disputes') await upsertDisputes(payloadObj[key]);
       else if(key === 'knowledgeUpdates') await upsertJsonCollection('knowledge_updates', payloadObj[key]);
       else if(key === 'teamUsedQuestionIds' || key === 'userCompletedQuizzes' || key === 'userSeenKnowledgeUpdates' || key === 'userKnowledgeDashboardViews' || key === 'userLogins'){
         await saveMetaKey(key, payloadObj[key]);
@@ -910,6 +933,7 @@ table.data-table tr:last-child td{border-bottom:none;}
       });
     }catch(e){
       console.error('saveData error:', e);
+      alert('একটি পরিবর্তন সেভ করতে ব্যর্থ হয়েছে এবং তা এখনো ডাটাবেজে জমা হয়নি:\n\n' + (e && e.message ? e.message : e) + '\n\nইন্টারনেট চেক করে আবার চেষ্টা করুন। রিফ্রেশ করলে এই পরিবর্তনটি হারিয়ে যেতে পারে।');
     }
     saveInFlight = false;
     if(savePendingAgain){ savePendingAgain = false; setTimeout(saveData, 0); }
