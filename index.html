@@ -3322,7 +3322,7 @@ table.data-table tr:last-child td{border-bottom:none;}
           disputeBtn.title = 'This question has already been reviewed and resolved. A second dispute cannot be raised.';
         }else{
           disputeBtn.textContent = 'Raise a dispute';
-          disputeBtn.disabled = true; disputeBtn.onclick = null;
+          disputeBtn.onclick = function(){ state.disputingAnswerIndex = disputeKey; render(); };
         }
         block.appendChild(disputeBtn);
       }
