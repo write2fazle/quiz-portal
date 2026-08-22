@@ -73,6 +73,8 @@ button{cursor:pointer;}
 .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
 .stat-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center;}
 .stat-icon{font-size:20px;margin-bottom:4px;}
+.stat-icon-svg{width:26px;height:26px;margin:0 auto 6px;color:var(--orange);display:flex;align-items:center;justify-content:center;}
+.stat-icon-svg .sidebar-svg-icon{width:24px;height:24px;stroke:currentColor;}
 .stat-num{font-size:24px;font-weight:700;color:var(--navy);font-family:'JetBrains Mono',monospace;}
 .stat-lbl{font-size:11px;color:var(--text-dim);margin-top:2px;}
 .empty-note{text-align:center;color:var(--text-mute);font-size:13px;padding:26px 10px;}
@@ -480,6 +482,7 @@ table.data-table tr:last-child td{border-bottom:none;}
     reportsStartDate: '',
     reportsEndDate: '',
     viewingAttemptId: null,
+    viewingDisputeId: null,
     historyOpenAttemptId: null,
     rememberChecked: true,
     kuMode: 'list',
@@ -524,18 +527,34 @@ table.data-table tr:last-child td{border-bottom:none;}
     return SUPABASE_URL + '/rest/v1/' + table + (query || '');
   }
 
-  async function supaRequest(url, options){
+  async function supaRequest(url, options, retriesLeft){
+    if(retriesLeft === undefined) retriesLeft = 2;
     options = options || {};
     options.headers = Object.assign({}, SUPA_HEADERS, options.headers || {});
-    var response = await fetch(url, options);
-    var text = await response.text();
-    var body = null;
-    try { body = text ? JSON.parse(text) : null; } catch(e) { body = text; }
-    if(!response.ok){
-      var msg = body && body.message ? body.message : text || ('HTTP ' + response.status);
-      throw new Error('Supabase ' + response.status + ': ' + msg);
+    try{
+      var response = await fetch(url, options);
+      var text = await response.text();
+      var body = null;
+      try { body = text ? JSON.parse(text) : null; } catch(e) { body = text; }
+      if(!response.ok){
+        var msg = body && body.message ? body.message : text || ('HTTP ' + response.status);
+        throw new Error('Supabase ' + response.status + ': ' + msg);
+      }
+      return body;
+    }catch(err){
+      // "Failed to fetch" is what the browser itself throws when a request
+      // never even reached the server (a brief Wi-Fi drop, a DNS hiccup,
+      // etc.) — not a real backend error. Retrying quietly a couple of
+      // times avoids bothering the user with a scary popup for something
+      // that resolves itself half a second later. Genuine, persistent
+      // failures still surface after the retries are exhausted.
+      var isNetworkLevelError = (err instanceof TypeError) || /failed to fetch|networkerror|load failed/i.test(err.message || '');
+      if(isNetworkLevelError && retriesLeft > 0){
+        await new Promise(function(res){ setTimeout(res, 700); });
+        return supaRequest(url, options, retriesLeft - 1);
+      }
+      throw err;
     }
-    return body;
   }
 
   function parseJsonValue(v, fallback){
@@ -1240,6 +1259,17 @@ table.data-table tr:last-child td{border-bottom:none;}
     return {score:correct,total:total,pct:total ? (correct/total)*100 : 0};
   }
 
+  // Requested: HOD, Management, and Service Quality & Experience Team
+  // members should never appear as a "Top Performer" anywhere (they
+  // evaluate/manage the quiz program rather than compete in it).
+  var TOP_PERFORMER_EXCLUDED_TEAMS = ['hod', 'service quality & experience team'];
+  function isExcludedFromTopPerformer(user){
+    if(!user) return false;
+    if(user.role === 'Management') return true;
+    var team = String(user.team || '').trim().toLowerCase();
+    return TOP_PERFORMER_EXCLUDED_TEAMS.indexOf(team) !== -1;
+  }
+
   function leaderboardData(teamFilter){
     var bestByUser = {};
     state.data.quizAttempts.forEach(function(a){
@@ -1261,6 +1291,7 @@ table.data-table tr:last-child td{border-bottom:none;}
     var rows = Object.keys(bestByUser).map(function(userId){
       var u = state.data.users.find(function(x){return x.id===userId;});
       if(!u) return null;
+      if(isExcludedFromTopPerformer(u)) return null;
       var item=bestByUser[userId], a=item.attempt, effective=item.effective;
       return {user:u, score:effective.score, total:effective.total, pct:Math.round(item.pct), attempts:1, finishedAt:a.finishedAt, quizTitle:a.quizTitle};
     }).filter(Boolean);
@@ -1274,15 +1305,131 @@ table.data-table tr:last-child td{border-bottom:none;}
     var table=document.createElement('table'); table.className='data-table';
     table.innerHTML='<tr><th>Team</th><th>Top Performer</th><th>Score</th><th>Quiz</th><th>Submitted</th></tr>';
     var has=false;
-    state.data.teams.forEach(function(team){
+    var visibleTeams = state.data.teams.filter(function(team){
+      return TOP_PERFORMER_EXCLUDED_TEAMS.indexOf(String(team).trim().toLowerCase()) === -1;
+    });
+    visibleTeams.forEach(function(team){
       var rows=leaderboardData(team); var r=rows[0];
       var tr=document.createElement('tr');
       if(r){has=true; tr.innerHTML='<td>'+escapeHtml(team)+'</td><td style="font-weight:600;">'+escapeHtml(r.user.name)+'</td><td>'+r.score+' / '+r.total+' ('+r.pct+'%)</td><td>'+escapeHtml(r.quizTitle||'—')+'</td><td>'+fmtDateTime(r.finishedAt)+'</td>';}
       else tr.innerHTML='<td>'+escapeHtml(team)+'</td><td colspan="4" style="color:var(--text-mute);">No published quiz result yet</td>';
       table.appendChild(tr);
     });
-    if(!state.data.teams.length) card.innerHTML+='<div class="empty-note">No teams found.</div>'; else card.appendChild(table);
+    if(!visibleTeams.length) card.innerHTML+='<div class="empty-note">No teams found.</div>'; else card.appendChild(table);
     return card;
+  }
+
+  /* ================= ADMIN DASHBOARD ================= */
+  function renderAdminDashboard(){
+    var wrap = document.createElement('div');
+
+    var titleCard = document.createElement('div');
+    titleCard.innerHTML = '<h2 style="font-size:16px;margin:0 0 14px;">Dashboard</h2>';
+    wrap.appendChild(titleCard);
+
+    wrap.appendChild(renderFilterCard(false, null));
+
+    var effectiveTeam = state.reportsTeamFilter;
+    var attempts = getFilteredAttempts(effectiveTeam);
+
+    var quizzers = state.data.users.filter(function(u){
+      if(u.role !== 'User') return false;
+      if(effectiveTeam && u.team !== effectiveTeam) return false;
+      if(state.reportsUserFilter && u.id !== state.reportsUserFilter) return false;
+      return true;
+    });
+    var filteredQuizzes = state.data.quizzes.filter(function(q){ return !effectiveTeam || q.team === effectiveTeam; });
+    var now = Date.now();
+    var upcomingQuizzes = filteredQuizzes.filter(function(q){ return quizEndMs(q) >= now; });
+
+    // --- top stat cards ---
+    var stats = document.createElement('div');
+    stats.className = 'stat-grid';
+    [
+      ['quizmgmt', filteredQuizzes.length, 'Quizzes'],
+      ['knowledge', state.data.questionBank.filter(function(q){ return !effectiveTeam || q.team===effectiveTeam; }).length, 'Questions'],
+      ['users', quizzers.length, 'Quizzers'],
+      ['events', upcomingQuizzes.length, 'Upcoming events']
+    ].forEach(function(s){
+      var c = document.createElement('div'); c.className = 'stat-card';
+      c.innerHTML = '<div class="stat-icon-svg">'+sidebarIconSvg(s[0])+'</div><div class="stat-num">'+s[1]+'</div><div class="stat-lbl">'+s[2]+'</div>';
+      stats.appendChild(c);
+    });
+    wrap.appendChild(stats);
+
+    // --- completion donut + engagement bars ---
+    var midRow = document.createElement('div');
+    midRow.style.cssText = 'display:grid;grid-template-columns:1fr 1.4fr;gap:16px;margin-bottom:16px;';
+
+    var completedCount = quizzers.filter(function(u){
+      return (state.data.userCompletedQuizzes[u.id]||[]).length > 0;
+    }).length;
+    var donutCard = document.createElement('div');
+    donutCard.className = 'card';
+    donutCard.innerHTML = '<div class="section-title">Quizzers Engagement</div>'+
+      buildDonutSVG([
+        {label:'Completed at least 1 quiz', value: completedCount, color:'var(--green)'},
+        {label:'Not started yet', value: Math.max(quizzers.length - completedCount, 0), color:'var(--surface-2)'}
+      ]);
+    midRow.appendChild(donutCard);
+
+    var engagementCard = document.createElement('div');
+    engagementCard.className = 'card';
+    engagementCard.innerHTML = '<div class="section-title">Quiz Engagement</div>';
+    var engagementBars = filteredQuizzes.slice().sort(function(a,b){
+      return (b.startDate||b.scheduledDate||'') < (a.startDate||a.scheduledDate||'') ? -1 : 1;
+    }).slice(0, 7).map(function(q){
+      var eligible = quizzers.filter(function(u){ return u.team === q.team; });
+      var completed = eligible.filter(function(u){ return (state.data.userCompletedQuizzes[u.id]||[]).indexOf(q.id) !== -1; });
+      var pct = eligible.length ? Math.round(completed.length/eligible.length*100) : 0;
+      return {label:q.title, value: pct};
+    });
+    engagementCard.innerHTML += buildBarList(engagementBars);
+    midRow.appendChild(engagementCard);
+    wrap.appendChild(midRow);
+
+    // --- leaderboard distribution donut + recently added ---
+    var botRow = document.createElement('div');
+    botRow.style.cssText = 'display:grid;grid-template-columns:1.2fr 1fr;gap:16px;';
+
+    var teamColors = ['var(--orange)','var(--blue)','var(--green)','#8A63D2','#12A594','var(--red)','#D2A63A'];
+    var visibleTeams = state.data.teams.filter(function(tm){
+      return TOP_PERFORMER_EXCLUDED_TEAMS.indexOf(String(tm).trim().toLowerCase()) === -1
+        && (!effectiveTeam || tm === effectiveTeam);
+    });
+    var teamAttemptCounts = visibleTeams.map(function(tm, i){
+      var count = attempts.filter(function(a){ return a.team === tm; }).length;
+      return {label:tm, value:count, color: teamColors[i % teamColors.length]};
+    });
+    var lbCard = document.createElement('div');
+    lbCard.className = 'card';
+    lbCard.innerHTML = '<div class="section-title">Quiz Attempts by Team</div>'+buildDonutSVG(teamAttemptCounts);
+    botRow.appendChild(lbCard);
+
+    var recentCard = document.createElement('div');
+    recentCard.className = 'card';
+    recentCard.innerHTML = '<div class="section-title">Recently Added</div>';
+    var recentList = document.createElement('div');
+    var recentItems = filteredQuizzes.slice(-4).reverse();
+    if(!recentItems.length){
+      recentList.innerHTML = '<div class="empty-note">No quizzes added yet.</div>';
+    }else{
+      recentItems.forEach(function(q){
+        var item = document.createElement('div');
+        item.style.cssText = 'border-left:3px solid var(--orange);background:var(--surface-2);border-radius:8px;padding:10px 12px;margin-bottom:10px;';
+        item.innerHTML = '<div style="font-weight:600;font-size:13px;">'+escapeHtml(q.title)+'</div>'+
+          '<div style="font-size:11px;color:var(--text-mute);margin-top:4px;">Team: '+escapeHtml(q.team)+' &nbsp;·&nbsp; Questions: '+q.questionIds.length+'</div>';
+        recentList.appendChild(item);
+      });
+    }
+    recentCard.appendChild(recentList);
+    botRow.appendChild(recentCard);
+    wrap.appendChild(botRow);
+
+    // --- top performers snapshot (respects exclusion rule) ---
+    wrap.appendChild(renderAllTeamsTopPerformersCard());
+
+    return wrap;
   }
 
   /* ================= RENDER ROOT ================= */
@@ -1315,7 +1462,8 @@ table.data-table tr:last-child td{border-bottom:none;}
     workspace.appendChild(shell);
 
     if(user.role === 'Admin'){
-      if(state.tab === 'users') shell.appendChild(renderUserManagement());
+      if(state.tab === 'dashboard') shell.appendChild(renderAdminDashboard());
+      else if(state.tab === 'users') shell.appendChild(renderUserManagement());
       else if(state.tab === 'teams') shell.appendChild(renderTeamManagement());
       else if(state.tab === 'quizmgmt') shell.appendChild(renderQuizManagement());
       else if(state.tab === 'disputes') shell.appendChild(renderDisputeManagement());
@@ -1323,9 +1471,11 @@ table.data-table tr:last-child td{border-bottom:none;}
       else if(state.tab === 'reports') shell.appendChild(renderReports(null));
       else if(state.tab === 'backup') shell.appendChild(renderBackupRestore());
       else if(state.tab === 'audit') shell.appendChild(renderAuditLogAdmin());
-      else shell.appendChild(renderUserManagement());
+      else shell.appendChild(renderAdminDashboard());
     }else if(user.role === 'Management'){
-      shell.appendChild(renderReports(null));
+      if(state.tab === 'reports') shell.appendChild(renderReports(null));
+      else if(state.tab === 'disputes') shell.appendChild(renderDisputeManagement());
+      else shell.appendChild(renderAdminDashboard());
     }else if(user.role === 'Team Leader'){
       shell.appendChild(renderLeaderTabs());
       if(state.tab === 'teamdash') shell.appendChild(renderReports(user.team));
@@ -1343,6 +1493,7 @@ table.data-table tr:last-child td{border-bottom:none;}
     root.appendChild(layout);
     if(state.quizSession) root.appendChild(renderQuizModal());
     if(state.viewingAttemptId) root.appendChild(renderAttemptDetailModal());
+    if(state.viewingDisputeId) root.appendChild(renderDisputeDetailModal());
     if(state.viewingKuId) root.appendChild(renderKnowledgeUpdateViewModal());
     if(state.viewingQuestionAuditId) root.appendChild(renderQuestionAuditModal(state.viewingQuestionAuditId));
   }
@@ -1409,7 +1560,7 @@ table.data-table tr:last-child td{border-bottom:none;}
       state.data.userLogins[u.id] = Date.now();
       saveData();
       sessionSet(SESSION_KEY, u.id);
-      state.tab = u.role === 'Admin' ? 'users' : (u.role === 'Team Leader' ? 'teamdash' : 'quiz');
+      state.tab = u.role === 'Admin' ? 'dashboard' : (u.role === 'Management' ? 'dashboard' : (u.role === 'Team Leader' ? 'teamdash' : 'quiz'));
       render();
       // Letting the form's own submit event fire (rather than only handling
       // a button click) is what allows Chrome/Firefox/Edge to detect this as
@@ -1434,6 +1585,8 @@ table.data-table tr:last-child td{border-bottom:none;}
       users:'<circle cx="12" cy="8" r="3"></circle><path d="M5 20c0-3 2.5-5 7-5s7 2 7 5"></path><path d="M18 6.5c1.7.2 3 1.2 3 3s-1.3 2.8-3 3"></path>',
       teams:'<circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3 20c0-3.2 2.2-5 6-5s6 1.8 6 5"></path><path d="M15 15.5c3.2.2 5 1.7 5 4.5"></path>',
       quizmgmt:'<rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M8 7h8M8 11h8M8 15h5"></path><path d="M16 15l1.2 1.2L20 13.5"></path>',
+      dashboard:'<rect x="3" y="3" width="8" height="8" rx="1.5"></rect><rect x="13" y="3" width="8" height="5" rx="1.5"></rect><rect x="13" y="10" width="8" height="11" rx="1.5"></rect><rect x="3" y="13" width="8" height="8" rx="1.5"></rect>',
+      events:'<rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path><circle cx="8.5" cy="14.5" r="1.1" fill="currentColor" stroke="none"></circle><circle cx="12" cy="14.5" r="1.1" fill="currentColor" stroke="none"></circle><circle cx="15.5" cy="14.5" r="1.1" fill="currentColor" stroke="none"></circle>',
       disputes:'<path d="M12 3l9 17H3L12 3z"></path><path d="M12 9v4M12 16h.01"></path>',
       knowledge:'<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"></path><path d="M4 5.5v15M8 7h8M8 11h8"></path>',
       reports:'<path d="M5 20V11M12 20V4M19 20v-7"></path><path d="M3 20h18"></path>',
@@ -1470,6 +1623,7 @@ table.data-table tr:last-child td{border-bottom:none;}
     if(user.role === 'Admin'){
       var pendingCount = state.data.disputes.filter(function(d){return d.status==='pending';}).length;
       items = [
+        ['dashboard','Dashboard','dashboard'],
         ['users','User Accounts','users'],['teams','Teams','teams'],['quizmgmt','Quiz Management','quizmgmt'],
         ['disputes','Disputes','disputes',pendingCount],['knowledge','Knowledge Updates','knowledge'],
         ['reports','Reports','reports'],['audit','Audit Log','audit'],['backup','Backup & Restore','backup']
@@ -1477,7 +1631,7 @@ table.data-table tr:last-child td{border-bottom:none;}
     }else if(user.role === 'Team Leader'){
       items = [['teamdash','Team Dashboard','teamdash'],['password','Change Password','password']];
     }else if(user.role === 'Management'){
-      items = [['reports','Reports','reports']];
+      items = [['dashboard','Dashboard','dashboard'],['disputes','Disputes','disputes'],['reports','Reports','reports']];
     }else{
       items = [['quiz','Take Quiz','quiz'],['profile','My Profile','profile'],['password','Change Password','password']];
     }
@@ -2864,11 +3018,17 @@ table.data-table tr:last-child td{border-bottom:none;}
     }else{
       var resTable = document.createElement('table');
       resTable.className = 'data-table';
-      resTable.innerHTML = '<tr><th>Question</th><th>Raised by</th><th>Outcome</th><th>Resolved</th></tr>';
+      resTable.innerHTML = '<tr><th>Question</th><th>Raised by</th><th>Outcome</th><th>Resolved</th><th></th></tr>';
       var resolutionLabels = {disputed_correct:'Disputed answer accepted', original_correct:'Original answer confirmed', both_correct:'Both answers accepted'};
       resolved.forEach(function(d){
         var tr = document.createElement('tr');
         tr.innerHTML = '<td>'+escapeHtml(d.questionText)+'</td><td>'+escapeHtml(d.userName)+'</td><td>'+(resolutionLabels[d.resolution]||d.resolution)+'</td><td>'+fmtDateTime(d.resolvedAt)+'</td>';
+        var tdV = document.createElement('td');
+        var viewBtn = document.createElement('button');
+        viewBtn.className = 'btn secondary small'; viewBtn.textContent = 'View';
+        viewBtn.onclick = function(){ state.viewingDisputeId = d.id; render(); };
+        tdV.appendChild(viewBtn);
+        tr.appendChild(tdV);
         resTable.appendChild(tr);
       });
       resolvedCard.appendChild(resTable);
@@ -2877,17 +3037,43 @@ table.data-table tr:last-child td{border-bottom:none;}
     return wrap;
   }
 
+  function renderDisputeDetailModal(){
+    var d = state.data.disputes.find(function(x){return x.id===state.viewingDisputeId;});
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    var box = document.createElement('div');
+    box.className = 'modal-box';
+    if(!d){
+      box.innerHTML = '<div class="empty-note">This dispute no longer exists.</div>';
+      overlay.appendChild(box);
+      return overlay;
+    }
+    var resolutionLabels = {disputed_correct:'Disputed answer accepted', original_correct:'Original answer confirmed', both_correct:'Both answers accepted'};
+    var head = document.createElement('div');
+    head.className = 'modal-head';
+    head.innerHTML = '<div><div class="modal-title">Dispute detail</div><div style="font-size:12px;color:var(--text-dim);margin-top:4px;">'+escapeHtml(d.status==='pending' ? 'Pending' : (resolutionLabels[d.resolution]||d.resolution))+'</div></div>';
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'modal-close'; closeBtn.textContent = '\u2715';
+    closeBtn.onclick = function(){ state.viewingDisputeId = null; render(); };
+    head.appendChild(closeBtn);
+    box.appendChild(head);
+
+    var body = document.createElement('div');
+    body.style.cssText = 'font-size:13px;line-height:1.8;';
+    body.innerHTML =
+      '<div style="margin-bottom:10px;"><b>Question:</b> '+escapeHtml(d.questionText)+'</div>'+
+      '<div style="margin-bottom:10px;"><b>Raised by:</b> '+escapeHtml(d.userName)+' ('+escapeHtml(d.team||'\u2014')+') on '+fmtDateTime(d.createdAt)+'</div>'+
+      '<div style="margin-bottom:10px;"><b>User\u2019s answer:</b> '+escapeHtml(d.selectedOption)+' &nbsp;\u00b7&nbsp; <b>Originally marked correct:</b> '+escapeHtml(d.originalCorrectOption)+'</div>'+
+      (d.note ? '<div style="margin-bottom:10px;"><b>User\u2019s note:</b> \u201c'+escapeHtml(d.note)+'\u201d</div>' : '')+
+      (d.status!=='pending' ? '<div style="margin-bottom:10px;"><b>Outcome:</b> '+escapeHtml(resolutionLabels[d.resolution]||d.resolution)+'</div>'+
+        '<div style="margin-bottom:10px;"><b>Resolved at:</b> '+fmtDateTime(d.resolvedAt)+'</div>' : '<div style="color:var(--text-mute);">Still pending review.</div>');
+    box.appendChild(body);
+    overlay.appendChild(box);
+    return overlay;
+  }
+
   /* ================= REPORTS (Admin / Management / Team Leader) ================= */
-  function renderReports(teamFilter){
-    var wrap = document.createElement('div');
-    var isScopedToTeam = !!teamFilter;
-
-    var titleCard = document.createElement('div');
-    titleCard.innerHTML = '<h2 style="font-size:16px;margin:0 0 14px;">'+(isScopedToTeam ? escapeHtml(teamFilter)+' \u2014 Team Dashboard' : 'Reports & Results Monitoring')+'</h2>';
-    wrap.appendChild(titleCard);
-    wrap.appendChild(renderKnowledgeUpdatesCard());
-    if(!isScopedToTeam) wrap.appendChild(renderAllTeamsTopPerformersCard());
-
+  function renderFilterCard(isScopedToTeam, teamFilter){
     var effectiveTeam = isScopedToTeam ? teamFilter : state.reportsTeamFilter;
 
     var filterCard = document.createElement('div');
@@ -2950,80 +3136,161 @@ table.data-table tr:last-child td{border-bottom:none;}
     };
     filterRow.appendChild(resetFiltersBtn);
     filterCard.appendChild(filterRow);
-    wrap.appendChild(filterCard);
+    return filterCard;
+  }
 
-    var attempts = state.data.quizAttempts.filter(function(a){
+  function getFilteredAttempts(effectiveTeam){
+    return state.data.quizAttempts.filter(function(a){
       if(effectiveTeam && a.team !== effectiveTeam) return false;
       if(state.reportsUserFilter && a.userId !== state.reportsUserFilter) return false;
       if(state.reportsStartDate && a.quizDate < state.reportsStartDate) return false;
       if(state.reportsEndDate && a.quizDate > state.reportsEndDate) return false;
       return true;
     });
+  }
 
-    // --- icon stat cards ---
-    var stats = document.createElement('div');
-    stats.className = 'stat-grid';
-    var totalAttempts = attempts.length;
-    var totalQuizzes = state.data.quizzes.filter(function(q){ return !isScopedToTeam || q.team===teamFilter; }).length;
-    var avgPct = totalAttempts ? Math.round(attempts.reduce(function(s,a){return s+(a.score/a.total);},0)/totalAttempts*100) : 0;
-    var pendingDisputes = state.data.disputes.filter(function(d){ return d.status==='pending' && (!isScopedToTeam || d.team===teamFilter); }).length;
-    [
-      ['\ud83e\uddfe', totalQuizzes, 'Quizzes created'],
-      ['\ud83d\udcdd', totalAttempts, 'Attempts submitted'],
-      ['\ud83c\udfaf', avgPct+'%', 'Average score'],
-      ['\u26a0\ufe0f', pendingDisputes, 'Pending disputes']
-    ].forEach(function(s){
-      var c = document.createElement('div'); c.className = 'stat-card';
-      c.innerHTML = '<div class="stat-icon">'+s[0]+'</div><div class="stat-num">'+s[1]+'</div><div class="stat-lbl">'+s[2]+'</div>';
-      stats.appendChild(c);
+  function monthLabel(dateStr){
+    var d = new Date(dateStr + 'T00:00:00');
+    var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return months[d.getMonth()] + "'" + String(d.getFullYear()).slice(-2);
+  }
+
+  function downloadMonthlyReport(effectiveTeam){
+    // Which month to report on: the "From date" filter if the admin set
+    // one, otherwise the current month.
+    var refDateStr = state.reportsStartDate || new Date().toISOString().slice(0,10);
+    var refDate = new Date(refDateStr + 'T00:00:00');
+    var y = refDate.getFullYear(), m = refDate.getMonth();
+
+    var monthQuizzes = state.data.quizzes.filter(function(q){
+      if(effectiveTeam && q.team !== effectiveTeam) return false;
+      var dateStr = q.scheduledDate || q.startDate;
+      if(!dateStr) return false;
+      var qd = new Date(dateStr + 'T00:00:00');
+      return qd.getFullYear() === y && qd.getMonth() === m;
+    }).sort(function(a,b){
+      var da = a.scheduledDate || a.startDate, db = b.scheduledDate || b.startDate;
+      return da < db ? -1 : (da > db ? 1 : 0);
     });
-    wrap.appendChild(stats);
 
-    // --- charts ---
-    var chartCard = document.createElement('div');
-    chartCard.className = 'card';
-    chartCard.innerHTML = '<div class="section-title">At a glance</div>';
-    var chartRow = document.createElement('div');
-    chartRow.className = 'chart-row';
+    if(!monthQuizzes.length){
+      alert('নির্বাচিত মাসে (' + monthLabel(refDateStr) + ') কোনো কুইজ পাওয়া যায়নি। "From date" ফিল্টার দিয়ে নির্দিষ্ট মাস বেছে নিন।');
+      return;
+    }
 
-    var correctTotal = 0, incorrectTotal = 0;
-    attempts.forEach(function(a){ (a.answers||[]).forEach(function(ans){ if(ans.isCorrect) correctTotal++; else incorrectTotal++; }); });
-    var donutBox = document.createElement('div');
-    donutBox.className = 'chart-box';
-    donutBox.innerHTML = '<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">Correct vs incorrect answers</div>'+
-      buildDonutSVG([{label:'Correct', value:correctTotal, color:'var(--green)'},{label:'Incorrect', value:incorrectTotal, color:'var(--red)'}]);
-    chartRow.appendChild(donutBox);
+    var mLabel = monthLabel(refDateStr);
+    var header = ['S/N', 'Name', 'Team'];
+    monthQuizzes.forEach(function(q, i){
+      header.push(mLabel + ' Quiz-' + (i + 1));
+      header.push('Out of ' + (q.questionIds ? q.questionIds.length : 10));
+    });
+    header.push('Average Score');
 
-    var barBox = document.createElement('div');
-    barBox.className = 'chart-box';
-    var barLabel, barData;
+    var users = state.data.users.filter(function(u){
+      if(u.role !== 'User') return false;
+      if(effectiveTeam && u.team !== effectiveTeam) return false;
+      if(state.reportsUserFilter && u.id !== state.reportsUserFilter) return false;
+      return true;
+    });
+
+    var rows = users.map(function(u, idx){
+      var row = [idx + 1, u.name, u.team || '—'];
+      var pctSum = 0, pctCount = 0;
+      monthQuizzes.forEach(function(q){
+        var attempt = state.data.quizAttempts.find(function(a){ return a.userId === u.id && a.quizId === q.id; });
+        if(attempt){
+          var eff = effectiveAttemptScore(attempt);
+          row.push(eff.score);
+          pctSum += eff.pct; pctCount++;
+        }else{
+          row.push('—');
+        }
+        row.push(q.questionIds ? q.questionIds.length : 10);
+      });
+      row.push(pctCount ? Math.round(pctSum / pctCount) + '%' : '—');
+      return row;
+    });
+
+    downloadCSV('monthly-report-' + mLabel.replace("'", '-') + '.csv', header, rows);
+  }
+
+  function renderReports(teamFilter){
+    var wrap = document.createElement('div');
+    var isScopedToTeam = !!teamFilter;
+
+    var titleCard = document.createElement('div');
+    titleCard.innerHTML = '<h2 style="font-size:16px;margin:0 0 14px;">'+(isScopedToTeam ? escapeHtml(teamFilter)+' \u2014 Team Dashboard' : 'Reports & Results Monitoring')+'</h2>';
+    wrap.appendChild(titleCard);
     if(isScopedToTeam){
-      barLabel = 'Average score by team member';
+      wrap.appendChild(renderKnowledgeUpdatesCard());
+    }
+
+    var effectiveTeam = isScopedToTeam ? teamFilter : state.reportsTeamFilter;
+
+    wrap.appendChild(renderFilterCard(isScopedToTeam, teamFilter));
+
+    var attempts = getFilteredAttempts(effectiveTeam);
+
+    // The Admin/Management "Reports" page is intentionally kept to just
+    // Filters + All results (per the requested cleanup) — the stat cards,
+    // charts, and leaderboard now live on the Dashboard instead. The Team
+    // Leader's "Team Dashboard" keeps its fuller view since that's a
+    // separate page.
+    if(isScopedToTeam){
+      // --- icon stat cards ---
+      var stats = document.createElement('div');
+      stats.className = 'stat-grid';
+      var totalAttempts = attempts.length;
+      var totalQuizzes = state.data.quizzes.filter(function(q){ return !isScopedToTeam || q.team===teamFilter; }).length;
+      var avgPct = totalAttempts ? Math.round(attempts.reduce(function(s,a){return s+(a.score/a.total);},0)/totalAttempts*100) : 0;
+      var pendingDisputes = state.data.disputes.filter(function(d){ return d.status==='pending' && (!isScopedToTeam || d.team===teamFilter); }).length;
+      [
+        ['\ud83e\uddfe', totalQuizzes, 'Quizzes created'],
+        ['\ud83d\udcdd', totalAttempts, 'Attempts submitted'],
+        ['\ud83c\udfaf', avgPct+'%', 'Average score'],
+        ['\u26a0\ufe0f', pendingDisputes, 'Pending disputes']
+      ].forEach(function(s){
+        var c = document.createElement('div'); c.className = 'stat-card';
+        c.innerHTML = '<div class="stat-icon">'+s[0]+'</div><div class="stat-num">'+s[1]+'</div><div class="stat-lbl">'+s[2]+'</div>';
+        stats.appendChild(c);
+      });
+      wrap.appendChild(stats);
+
+      // --- charts ---
+      var chartCard = document.createElement('div');
+      chartCard.className = 'card';
+      chartCard.innerHTML = '<div class="section-title">At a glance</div>';
+      var chartRow = document.createElement('div');
+      chartRow.className = 'chart-row';
+
+      var correctTotal = 0, incorrectTotal = 0;
+      attempts.forEach(function(a){ (a.answers||[]).forEach(function(ans){ if(ans.isCorrect) correctTotal++; else incorrectTotal++; }); });
+      var donutBox = document.createElement('div');
+      donutBox.className = 'chart-box';
+      donutBox.innerHTML = '<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">Correct vs incorrect answers</div>'+
+        buildDonutSVG([{label:'Correct', value:correctTotal, color:'var(--green)'},{label:'Incorrect', value:incorrectTotal, color:'var(--red)'}]);
+      chartRow.appendChild(donutBox);
+
+      var barBox = document.createElement('div');
+      barBox.className = 'chart-box';
+      var barLabel = 'Average score by team member';
       var byUser = {};
       attempts.forEach(function(a){
         if(!byUser[a.userId]) byUser[a.userId] = {score:0,total:0,name:a.userName};
         byUser[a.userId].score += a.score; byUser[a.userId].total += a.total;
       });
-      barData = Object.keys(byUser).map(function(uidKey){
+      var barData = Object.keys(byUser).map(function(uidKey){
         var u = byUser[uidKey];
         return {label:u.name, value: u.total ? Math.round(u.score/u.total*100) : 0};
       }).sort(function(a,b){return b.value-a.value;}).slice(0,8);
-    }else{
-      barLabel = 'Average score by team';
-      barData = state.data.teams.map(function(tm){
-        var teamAttempts = state.data.quizAttempts.filter(function(a){return a.team===tm;});
-        var s = teamAttempts.reduce(function(acc,a){return acc+a.score;},0);
-        var t = teamAttempts.reduce(function(acc,a){return acc+a.total;},0);
-        return {label:tm, value: t ? Math.round(s/t*100) : 0};
-      });
-    }
-    barBox.innerHTML = '<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">'+barLabel+'</div>'+buildBarList(barData);
-    chartRow.appendChild(barBox);
-    chartCard.appendChild(chartRow);
-    wrap.appendChild(chartCard);
+      barBox.innerHTML = '<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">'+barLabel+'</div>'+buildBarList(barData);
+      chartRow.appendChild(barBox);
+      chartCard.appendChild(chartRow);
+      wrap.appendChild(chartCard);
 
-    // --- leaderboard ---
-    wrap.appendChild(renderLeaderboardCard(5, teamFilter));
+      // --- leaderboard ---
+      wrap.appendChild(renderLeaderboardCard(5, teamFilter));
+    }
 
     // --- results table ---
     var card = document.createElement('div');
@@ -3036,11 +3303,20 @@ table.data-table tr:last-child td{border-bottom:none;}
       downloadAllBtn.className = 'btn secondary small';
       downloadAllBtn.textContent = 'Download all results (CSV)';
       downloadAllBtn.style.marginBottom = '12px';
+      downloadAllBtn.style.marginRight = '8px';
       downloadAllBtn.onclick = function(){
         var rows = attempts.map(function(a){ return [a.userName, a.userEmail, a.team, a.quizTitle, fmtDate(a.quizDate), a.score, a.total, fmtDateTime(a.finishedAt)]; });
         downloadCSV('quiz-results.csv', ['User','Email','Team','Quiz','Quiz date','Score','Total','Completed at'], rows);
       };
       card.appendChild(downloadAllBtn);
+
+      var monthlyReportBtn = document.createElement('button');
+      monthlyReportBtn.className = 'btn secondary small';
+      monthlyReportBtn.textContent = 'Download monthly report (CSV)';
+      monthlyReportBtn.style.marginBottom = '12px';
+      monthlyReportBtn.title = '"From date" ফিল্টার দিয়ে যে মাস বেছে নেবেন, সেই মাসের রিপোর্ট তৈরি হবে (নাহলে চলতি মাস)';
+      monthlyReportBtn.onclick = function(){ downloadMonthlyReport(effectiveTeam); };
+      card.appendChild(monthlyReportBtn);
 
       var table = document.createElement('table');
       table.className = 'data-table';
