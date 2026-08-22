@@ -1471,10 +1471,12 @@ table.data-table tr:last-child td{border-bottom:none;}
       else if(state.tab === 'reports') shell.appendChild(renderReports(null));
       else if(state.tab === 'backup') shell.appendChild(renderBackupRestore());
       else if(state.tab === 'audit') shell.appendChild(renderAuditLogAdmin());
+      else if(state.tab === 'password') shell.appendChild(renderChangePassword());
       else shell.appendChild(renderAdminDashboard());
     }else if(user.role === 'Management'){
       if(state.tab === 'reports') shell.appendChild(renderReports(null));
       else if(state.tab === 'disputes') shell.appendChild(renderDisputeManagement());
+      else if(state.tab === 'password') shell.appendChild(renderChangePassword());
       else shell.appendChild(renderAdminDashboard());
     }else if(user.role === 'Team Leader'){
       shell.appendChild(renderLeaderTabs());
@@ -1626,12 +1628,13 @@ table.data-table tr:last-child td{border-bottom:none;}
         ['dashboard','Dashboard','dashboard'],
         ['users','User Accounts','users'],['teams','Teams','teams'],['quizmgmt','Quiz Management','quizmgmt'],
         ['disputes','Disputes','disputes',pendingCount],['knowledge','Knowledge Updates','knowledge'],
-        ['reports','Reports','reports'],['audit','Audit Log','audit'],['backup','Backup & Restore','backup']
+        ['reports','Reports','reports'],['audit','Audit Log','audit'],['backup','Backup & Restore','backup'],
+        ['password','Change Password','password']
       ];
     }else if(user.role === 'Team Leader'){
       items = [['teamdash','Team Dashboard','teamdash'],['password','Change Password','password']];
     }else if(user.role === 'Management'){
-      items = [['dashboard','Dashboard','dashboard'],['disputes','Disputes','disputes'],['reports','Reports','reports']];
+      items = [['dashboard','Dashboard','dashboard'],['disputes','Disputes','disputes'],['reports','Reports','reports'],['password','Change Password','password']];
     }else{
       items = [['quiz','Take Quiz','quiz'],['profile','My Profile','profile'],['password','Change Password','password']];
     }
